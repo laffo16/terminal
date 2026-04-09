@@ -58,6 +58,7 @@ namespace TerminalAppLocalTests
         TEST_METHOD(ParseSwapPaneArgs);
         TEST_METHOD(ParseArgumentsWithParsingTerminators);
         TEST_METHOD(ParseFocusPaneArgs);
+        TEST_METHOD(ParseSendInputArgs);
 
         TEST_METHOD(ParseNoCommandIsNewTab);
 
@@ -1460,6 +1461,106 @@ namespace TerminalAppLocalTests
                 VERIFY_IS_NOT_NULL(myArgs);
                 VERIFY_ARE_EQUAL(1u, myArgs.Id());
             }
+        }
+    }
+
+    void CommandlineTest::ParseSendInputArgs()
+    {
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"send-input" };
+
+            Log::Comment(NoThrowString().Format(
+                L"send-input without any text should fail."));
+            _buildCommandlinesExpectFailureHelper(appArgs, 1u, rawCommands);
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"send-input", L"hello", L"world" };
+            _buildCommandlinesHelper(appArgs, 1u, rawCommands);
+
+            VERIFY_ARE_EQUAL(2u, appArgs._startupActions.size());
+            VERIFY_ARE_EQUAL(ShortcutAction::NewTab, appArgs._startupActions.at(0).Action());
+
+            const auto actionAndArgs = appArgs._startupActions.at(1);
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, actionAndArgs.Action());
+            VERIFY_IS_NOT_NULL(actionAndArgs.Args());
+
+            const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
+            VERIFY_IS_NOT_NULL(myArgs);
+            VERIFY_ARE_EQUAL(L"hello world", myArgs.Input());
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"send-input", L"--enter", L"echo", L"ready" };
+            _buildCommandlinesHelper(appArgs, 1u, rawCommands);
+
+            VERIFY_ARE_EQUAL(2u, appArgs._startupActions.size());
+            VERIFY_ARE_EQUAL(ShortcutAction::NewTab, appArgs._startupActions.at(0).Action());
+
+            const auto actionAndArgs = appArgs._startupActions.at(1);
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, actionAndArgs.Action());
+            VERIFY_IS_NOT_NULL(actionAndArgs.Args());
+
+            const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
+            VERIFY_IS_NOT_NULL(myArgs);
+            VERIFY_ARE_EQUAL(L"echo ready\r", myArgs.Input());
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"send-input", L"--escape", L"\\u001b[A" };
+            _buildCommandlinesHelper(appArgs, 1u, rawCommands);
+
+            VERIFY_ARE_EQUAL(2u, appArgs._startupActions.size());
+            VERIFY_ARE_EQUAL(ShortcutAction::NewTab, appArgs._startupActions.at(0).Action());
+
+            const auto actionAndArgs = appArgs._startupActions.at(1);
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, actionAndArgs.Action());
+            VERIFY_IS_NOT_NULL(actionAndArgs.Args());
+
+            const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
+            VERIFY_IS_NOT_NULL(myArgs);
+            VERIFY_ARE_EQUAL(winrt::hstring{ L"\u001b[A" }, myArgs.Input());
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"-w", L"0", L"send-input", L"hello", L"world" };
+            _buildCommandlinesHelper(appArgs, 1u, rawCommands);
+
+            VERIFY_ARE_EQUAL(1u, appArgs._startupActions.size());
+
+            const auto actionAndArgs = appArgs._startupActions.at(0);
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, actionAndArgs.Action());
+            VERIFY_ARE_EQUAL(std::string{ "0" }, std::string{ appArgs.GetTargetWindow() });
+            VERIFY_IS_NOT_NULL(actionAndArgs.Args());
+
+            const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
+            VERIFY_IS_NOT_NULL(myArgs);
+            VERIFY_ARE_EQUAL(L"hello world", myArgs.Input());
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"-w", L"0", L"focus-tab", L"-t", L"2", L";", L"send-input", L"hello" };
+            _buildCommandlinesHelper(appArgs, 2u, rawCommands);
+
+            VERIFY_ARE_EQUAL(2u, appArgs._startupActions.size());
+            VERIFY_ARE_EQUAL(std::string{ "0" }, std::string{ appArgs.GetTargetWindow() });
+
+            const auto focusAction = appArgs._startupActions.at(0);
+            VERIFY_ARE_EQUAL(ShortcutAction::SwitchToTab, focusAction.Action());
+            VERIFY_IS_NOT_NULL(focusAction.Args());
+
+            const auto focusArgs = focusAction.Args().try_as<SwitchToTabArgs>();
+            VERIFY_IS_NOT_NULL(focusArgs);
+            VERIFY_ARE_EQUAL(2u, focusArgs.TabIndex());
+
+            const auto sendInputAction = appArgs._startupActions.at(1);
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, sendInputAction.Action());
+            VERIFY_IS_NOT_NULL(sendInputAction.Args());
+
+            const auto sendInputArgs = sendInputAction.Args().try_as<SendInputArgs>();
+            VERIFY_IS_NOT_NULL(sendInputArgs);
+            VERIFY_ARE_EQUAL(L"hello", sendInputArgs.Input());
         }
     }
 

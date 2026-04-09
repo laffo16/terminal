@@ -92,6 +92,7 @@ private:
     CLI::App* _swapPaneCommand;
     CLI::App* _focusPaneCommand;
     CLI::App* _focusPaneShort;
+    CLI::App* _sendInputCommand;
     CLI::App* _saveCommand;
 
     // Are you adding a new sub-command? Make sure to update _noCommandsProvided!
@@ -123,6 +124,9 @@ private:
     bool _focusPrevTab{ false };
 
     int _focusPaneTarget{ -1 };
+    std::vector<std::string> _sendInputText;
+    bool _sendInputEscapes{ false };
+    bool _sendInputEnter{ false };
     std::string _saveInputName;
     std::string _keyChordOption;
     // Are you adding more args here? Make sure to reset them in _resetStateToDefault
@@ -150,6 +154,9 @@ private:
     void _buildMovePaneParser();
     void _buildSwapPaneParser();
     void _buildFocusPaneParser();
+    void _buildSendInputParser();
+    bool _targetsExistingWindow() const noexcept;
+    bool _canTargetExistingWindowWithoutNewTab() const noexcept;
     bool _noCommandsProvided();
     void _resetStateToDefault();
     int _handleExit(const CLI::App& command, const CLI::Error& e);

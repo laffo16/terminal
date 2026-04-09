@@ -348,6 +348,18 @@
   <data name="CmdFocusPaneTargetArgDesc" xml:space="preserve">
     <value>Focus the pane at the given index</value>
   </data>
+  <data name="CmdSendInputDesc" xml:space="preserve">
+    <value>Send input to the active pane</value>
+  </data>
+  <data name="CmdSendInputArgDesc" xml:space="preserve">
+    <value>The text to send to the active pane</value>
+  </data>
+  <data name="CmdSendInputEscapeDesc" xml:space="preserve">
+    <value>Interpret the input using JSON-style escape sequences</value>
+  </data>
+  <data name="CmdSendInputEnterDesc" xml:space="preserve">
+    <value>Append a carriage return to the input</value>
+  </data>
   <data name="CmdProfileArgDesc" xml:space="preserve">
     <value>Open with the given profile. Accepts either the name or GUID of a profile</value>
   </data>

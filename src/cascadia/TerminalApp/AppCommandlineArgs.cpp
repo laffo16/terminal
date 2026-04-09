@@ -5,12 +5,52 @@
 #include "AppCommandlineArgs.h"
 #include "../types/inc/utils.hpp"
 #include "TerminalSettingsModel/ModelSerializationHelpers.h"
+#include <json/json.h>
 
 using namespace winrt::Microsoft::Terminal::Settings::Model;
 using namespace TerminalApp;
 
 // Either a ; at the start of a line, or a ; preceded by any non-\ char.
 const std::wregex AppCommandlineArgs::_commandDelimiterRegex{ LR"(^;|[^\\];)" };
+
+namespace
+{
+    std::string _joinInputSegments(const std::vector<std::string>& inputSegments)
+    {
+        std::string joinedInput;
+
+        for (const auto& segment : inputSegments)
+        {
+            if (!joinedInput.empty())
+            {
+                joinedInput.push_back(' ');
+            }
+
+            joinedInput.append(segment);
+        }
+
+        return joinedInput;
+    }
+
+    winrt::hstring _decodeEscapedInput(const std::string& rawInput)
+    {
+        std::string jsonString;
+        jsonString.reserve(rawInput.size() + 2);
+        jsonString.push_back('"');
+        jsonString.append(rawInput);
+        jsonString.push_back('"');
+
+        std::string errs;
+        std::unique_ptr<Json::CharReader> reader{ Json::CharReaderBuilder{}.newCharReader() };
+        Json::Value root;
+        if (reader->parse(jsonString.data(), jsonString.data() + jsonString.size(), &root, &errs) && root.isString())
+        {
+            return winrt::hstring{ til::u8u16(root.asString()) };
+        }
+
+        return winrt::to_hstring(rawInput);
+    }
+}
 
 AppCommandlineArgs::AppCommandlineArgs()
 {
@@ -208,6 +248,7 @@ void AppCommandlineArgs::_buildParser()
     _buildMovePaneParser();
     _buildSwapPaneParser();
     _buildFocusPaneParser();
+    _buildSendInputParser();
     _buildSaveSnippetParser();
 }
 
@@ -537,6 +578,40 @@ void AppCommandlineArgs::_buildFocusPaneParser()
     setupSubcommand(_focusPaneShort);
 }
 
+void AppCommandlineArgs::_buildSendInputParser()
+{
+    _sendInputCommand = _app.add_subcommand("send-input", RS_A(L"CmdSendInputDesc"));
+
+    _sendInputCommand->add_flag("--escape",
+                                _sendInputEscapes,
+                                RS_A(L"CmdSendInputEscapeDesc"));
+    _sendInputCommand->add_flag("--enter",
+                                _sendInputEnter,
+                                RS_A(L"CmdSendInputEnterDesc"));
+    auto* inputOpt = _sendInputCommand->add_option("input,",
+                                                   _sendInputText,
+                                                   RS_A(L"CmdSendInputArgDesc"));
+    inputOpt->required();
+    _sendInputCommand->positionals_at_end(true);
+
+    _sendInputCommand->callback([&, this]() {
+        ActionAndArgs sendInputAction{};
+        sendInputAction.Action(ShortcutAction::SendInput);
+
+        const auto rawInput = _joinInputSegments(_sendInputText);
+        auto input = _sendInputEscapes ? _decodeEscapedInput(rawInput) :
+                                         winrt::to_hstring(rawInput);
+
+        if (_sendInputEnter)
+        {
+            input = input + L"\r";
+        }
+
+        sendInputAction.Args(SendInputArgs{ input });
+        _startupActions.push_back(std::move(sendInputAction));
+    });
+}
+
 void AppCommandlineArgs::_buildSaveSnippetParser()
 {
     _saveCommand = _app.add_subcommand("x-save", RS_A(L"SaveSnippetDesc"));
@@ -775,6 +850,7 @@ bool AppCommandlineArgs::_noCommandsProvided()
              *_swapPaneCommand ||
              *_focusPaneCommand ||
              *_focusPaneShort ||
+             *_sendInputCommand ||
              *_newPaneShort.subcommand ||
              *_newPaneCommand.subcommand ||
              *_saveCommand);
@@ -813,6 +889,9 @@ void AppCommandlineArgs::_resetStateToDefault()
     _swapPaneDirection = FocusDirection::None;
 
     _focusPaneTarget = -1;
+    _sendInputText.clear();
+    _sendInputEscapes = false;
+    _sendInputEnter = false;
     _loadPersistedLayoutIdx = -1;
 
     // DON'T clear _launchMode here! This will get called once for every
@@ -1016,7 +1095,8 @@ void AppCommandlineArgs::ValidateStartupCommands()
     // (also, we don't need to do this if the only action is a x-save)
     else if (_startupActions.empty() ||
              (_startupActions.front().Action() != ShortcutAction::NewTab &&
-              _startupActions.front().Action() != ShortcutAction::SaveSnippet))
+              _startupActions.front().Action() != ShortcutAction::SaveSnippet &&
+              !_canTargetExistingWindowWithoutNewTab()))
     {
         // Build the NewTab action from the values we've parsed on the commandline.
         NewTerminalArgs newTerminalArgs{};
@@ -1026,6 +1106,43 @@ void AppCommandlineArgs::ValidateStartupCommands()
         _startupActions.insert(_startupActions.begin(), 1, newTabAction);
     }
 }
+
+bool AppCommandlineArgs::_targetsExistingWindow() const noexcept
+{
+    if (_windowTarget.empty())
+    {
+        return false;
+    }
+
+    if (const auto opt = til::parse_signed<int64_t>(_windowTarget, 10))
+    {
+        return *opt >= 0;
+    }
+
+    return _windowTarget == "last";
+}
+
+bool AppCommandlineArgs::_canTargetExistingWindowWithoutNewTab() const noexcept
+{
+    if (!_targetsExistingWindow() || _startupActions.empty())
+    {
+        return false;
+    }
+
+    switch (_startupActions.front().Action())
+    {
+    case ShortcutAction::SwitchToTab:
+    case ShortcutAction::NextTab:
+    case ShortcutAction::PrevTab:
+    case ShortcutAction::MoveFocus:
+    case ShortcutAction::FocusPane:
+    case ShortcutAction::SendInput:
+        return true;
+    default:
+        return false;
+    }
+}
+
 std::optional<uint32_t> AppCommandlineArgs::GetPersistedLayoutIdx() const noexcept
 {
     return _loadPersistedLayoutIdx >= 0 ?
