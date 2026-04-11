@@ -582,12 +582,17 @@ void AppCommandlineArgs::_buildSendInputParser()
 {
     _sendInputCommand = _app.add_subcommand("send-input", RS_A(L"CmdSendInputDesc"));
 
+    auto* enterOpt = _sendInputCommand->add_flag("--enter",
+                                                 _sendInputEnter,
+                                                 RS_A(L"CmdSendInputEnterDesc"));
     _sendInputCommand->add_flag("--escape",
                                 _sendInputEscapes,
                                 RS_A(L"CmdSendInputEscapeDesc"));
-    _sendInputCommand->add_flag("--enter",
-                                _sendInputEnter,
-                                RS_A(L"CmdSendInputEnterDesc"));
+    auto* enterDelayOpt = _sendInputCommand->add_option("--enter-delay-ms",
+                                                        _sendInputEnterDelayMs,
+                                                        RS_A(L"CmdSendInputEnterDelayDesc"));
+    enterDelayOpt->check(CLI::NonNegativeNumber);
+    enterDelayOpt->needs(enterOpt);
     auto* inputOpt = _sendInputCommand->add_option("input,",
                                                    _sendInputText,
                                                    RS_A(L"CmdSendInputArgDesc"));
@@ -602,12 +607,19 @@ void AppCommandlineArgs::_buildSendInputParser()
         auto input = _sendInputEscapes ? _decodeEscapedInput(rawInput) :
                                          winrt::to_hstring(rawInput);
 
-        if (_sendInputEnter)
+        if (_sendInputEnter && _sendInputEnterDelayMs == 0)
         {
             input = input + L"\r";
         }
 
-        sendInputAction.Args(SendInputArgs{ input });
+        if (_sendInputEnterDelayMs > 0)
+        {
+            sendInputAction.Args(SendInputArgs{ input, _sendInputEnterDelayMs });
+        }
+        else
+        {
+            sendInputAction.Args(SendInputArgs{ input });
+        }
         _startupActions.push_back(std::move(sendInputAction));
     });
 }
@@ -892,6 +904,7 @@ void AppCommandlineArgs::_resetStateToDefault()
     _sendInputText.clear();
     _sendInputEscapes = false;
     _sendInputEnter = false;
+    _sendInputEnterDelayMs = 0;
     _loadPersistedLayoutIdx = -1;
 
     // DON'T clear _launchMode here! This will get called once for every

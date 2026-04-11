@@ -853,6 +853,9 @@
   <data name="InputActionArgumentLocalized" xml:space="preserve">
     <value>Input</value>
   </data>
+  <data name="EnterDelayMsActionArgumentLocalized" xml:space="preserve">
+    <value>Enter delay (ms)</value>
+  </data>
   <data name="TargetActionArgumentLocalized" xml:space="preserve">
     <value>Target</value>
   </data>

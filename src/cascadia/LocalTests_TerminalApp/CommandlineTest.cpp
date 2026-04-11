@@ -1505,6 +1505,49 @@ namespace TerminalAppLocalTests
             const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
             VERIFY_IS_NOT_NULL(myArgs);
             VERIFY_ARE_EQUAL(L"echo ready\r", myArgs.Input());
+            VERIFY_ARE_EQUAL(0u, myArgs.EnterDelayMs());
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"send-input", L"--enter-delay-ms", L"75", L"echo", L"ready" };
+
+            Log::Comment(NoThrowString().Format(
+                L"send-input --enter-delay-ms without --enter should fail."));
+            _buildCommandlinesExpectFailureHelper(appArgs, 1u, rawCommands);
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"send-input", L"--enter", L"--enter-delay-ms", L"75", L"echo", L"ready" };
+            _buildCommandlinesHelper(appArgs, 1u, rawCommands);
+
+            VERIFY_ARE_EQUAL(2u, appArgs._startupActions.size());
+            VERIFY_ARE_EQUAL(ShortcutAction::NewTab, appArgs._startupActions.at(0).Action());
+
+            const auto actionAndArgs = appArgs._startupActions.at(1);
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, actionAndArgs.Action());
+            VERIFY_IS_NOT_NULL(actionAndArgs.Args());
+
+            const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
+            VERIFY_IS_NOT_NULL(myArgs);
+            VERIFY_ARE_EQUAL(L"echo ready", myArgs.Input());
+            VERIFY_ARE_EQUAL(75u, myArgs.EnterDelayMs());
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"send-input", L"--enter", L"--enter-delay-ms", L"0", L"echo", L"ready" };
+            _buildCommandlinesHelper(appArgs, 1u, rawCommands);
+
+            VERIFY_ARE_EQUAL(2u, appArgs._startupActions.size());
+            VERIFY_ARE_EQUAL(ShortcutAction::NewTab, appArgs._startupActions.at(0).Action());
+
+            const auto actionAndArgs = appArgs._startupActions.at(1);
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, actionAndArgs.Action());
+            VERIFY_IS_NOT_NULL(actionAndArgs.Args());
+
+            const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
+            VERIFY_IS_NOT_NULL(myArgs);
+            VERIFY_ARE_EQUAL(L"echo ready\r", myArgs.Input());
+            VERIFY_ARE_EQUAL(0u, myArgs.EnterDelayMs());
         }
         {
             AppCommandlineArgs appArgs{};

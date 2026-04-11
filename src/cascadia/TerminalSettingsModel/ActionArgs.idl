@@ -255,8 +255,10 @@ namespace Microsoft.Terminal.Settings.Model
     [default_interface] runtimeclass SendInputArgs : IActionArgs, IActionArgsDescriptorAccess
     {
         SendInputArgs(String input);
+        SendInputArgs(String input, UInt32 enterDelayMs);
 
         String Input { get; };
+        UInt32 EnterDelayMs { get; };
     };
 
     [default_interface] runtimeclass SplitPaneArgs : IActionArgs, IActionArgsDescriptorAccess

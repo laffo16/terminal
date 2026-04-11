@@ -51,6 +51,8 @@ namespace SettingsModelUnitTests
         TEST_METHOD(RoundtripUserDeletedColorSchemeCollision);
 
         TEST_METHOD(RoundtripGenerateActionID);
+        TEST_METHOD(SendInputZeroDelayPreservesGeneratedActionID);
+        TEST_METHOD(SendInputDelayedEnterGetsDistinctGeneratedActionID);
         TEST_METHOD(NoGeneratedIDsForIterableAndNestedCommands);
         TEST_METHOD(GeneratedActionIDsEqualForIdenticalCommands);
         TEST_METHOD(RoundtripLegacyToModernActions);
@@ -1003,6 +1005,93 @@ namespace SettingsModelUnitTests
         std::string_view expectedID{ R"(User.sendInput.)" SEND_INPUT_ARCH_SPECIFIC_ACTION_HASH };
 
         VERIFY_ARE_EQUAL(sendInputCmd.ID(), winrt::to_hstring(expectedID));
+    }
+
+    void SerializationTests::SendInputZeroDelayPreservesGeneratedActionID()
+    {
+        static constexpr std::string_view legacySettingsJson{ R"(
+        {
+            "actions": [
+                {
+                    "name": "foo",
+                    "command": { "action": "sendInput", "input": "just some input" },
+                    "keys": "ctrl+shift+w"
+                }
+            ]
+        })" };
+
+        static constexpr std::string_view explicitZeroDelaySettingsJson{ R"(
+        {
+            "actions": [
+                {
+                    "name": "foo",
+                    "command": { "action": "sendInput", "input": "just some input", "enterDelayMs": 0 },
+                    "keys": "ctrl+shift+w"
+                }
+            ]
+        })" };
+
+        implementation::SettingsLoader legacyLoader{ legacySettingsJson, implementation::LoadStringResource(IDR_DEFAULTS) };
+        legacyLoader.MergeInboxIntoUserSettings();
+        legacyLoader.FinalizeLayering();
+        legacyLoader.FixupUserSettings();
+        const auto legacySettings = winrt::make_self<implementation::CascadiaSettings>(std::move(legacyLoader));
+
+        implementation::SettingsLoader explicitZeroDelayLoader{ explicitZeroDelaySettingsJson, implementation::LoadStringResource(IDR_DEFAULTS) };
+        explicitZeroDelayLoader.MergeInboxIntoUserSettings();
+        explicitZeroDelayLoader.FinalizeLayering();
+        explicitZeroDelayLoader.FixupUserSettings();
+        const auto explicitZeroDelaySettings = winrt::make_self<implementation::CascadiaSettings>(std::move(explicitZeroDelayLoader));
+
+        const auto legacySendInputCmd = legacySettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
+        const auto explicitZeroDelaySendInputCmd = explicitZeroDelaySettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
+
+        VERIFY_ARE_EQUAL(legacySendInputCmd.ID(), explicitZeroDelaySendInputCmd.ID());
+    }
+
+    void SerializationTests::SendInputDelayedEnterGetsDistinctGeneratedActionID()
+    {
+        static constexpr std::string_view legacySettingsJson{ R"(
+        {
+            "actions": [
+                {
+                    "name": "foo",
+                    "command": { "action": "sendInput", "input": "just some input" },
+                    "keys": "ctrl+shift+w"
+                }
+            ]
+        })" };
+
+        static constexpr std::string_view delayedEnterSettingsJson{ R"(
+        {
+            "actions": [
+                {
+                    "name": "foo",
+                    "command": { "action": "sendInput", "input": "just some input", "enterDelayMs": 75 },
+                    "keys": "ctrl+shift+w"
+                }
+            ]
+        })" };
+
+        implementation::SettingsLoader legacyLoader{ legacySettingsJson, implementation::LoadStringResource(IDR_DEFAULTS) };
+        legacyLoader.MergeInboxIntoUserSettings();
+        legacyLoader.FinalizeLayering();
+        legacyLoader.FixupUserSettings();
+        const auto legacySettings = winrt::make_self<implementation::CascadiaSettings>(std::move(legacyLoader));
+
+        implementation::SettingsLoader delayedEnterLoader{ delayedEnterSettingsJson, implementation::LoadStringResource(IDR_DEFAULTS) };
+        delayedEnterLoader.MergeInboxIntoUserSettings();
+        delayedEnterLoader.FinalizeLayering();
+        delayedEnterLoader.FixupUserSettings();
+        const auto delayedEnterSettings = winrt::make_self<implementation::CascadiaSettings>(std::move(delayedEnterLoader));
+
+        const auto legacySendInputCmd = legacySettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
+        const auto delayedEnterSendInputCmd = delayedEnterSettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
+        const auto delayedArgs = delayedEnterSendInputCmd.ActionAndArgs().Args().try_as<SendInputArgs>();
+
+        VERIFY_IS_NOT_NULL(delayedArgs);
+        VERIFY_ARE_NOT_EQUAL(legacySendInputCmd.ID(), delayedEnterSendInputCmd.ID());
+        VERIFY_ARE_EQUAL(75u, delayedArgs.EnterDelayMs());
     }
 
     void SerializationTests::NoGeneratedIDsForIterableAndNestedCommands()

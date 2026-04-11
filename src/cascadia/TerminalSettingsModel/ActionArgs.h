@@ -138,7 +138,8 @@ protected:                                                                  \
 
 ////////////////////////////////////////////////////////////////////////////////
 #define SEND_INPUT_ARGS(X) \
-    X(winrt::hstring, Input, "input", args->Input().empty(), ArgTypeHint::None, L"")
+    X(winrt::hstring, Input, "input", args->Input().empty(), ArgTypeHint::None, L"") \
+    X(uint32_t, EnterDelayMs, "enterDelayMs", false, ArgTypeHint::None, 0u)
 
 ////////////////////////////////////////////////////////////////////////////////
 #define OPEN_SETTINGS_ARGS(X) \
@@ -892,7 +893,65 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 
     ACTION_ARGS_STRUCT(AdjustFontSizeArgs, ADJUST_FONT_SIZE_ARGS);
 
-    ACTION_ARGS_STRUCT(SendInputArgs, SEND_INPUT_ARGS);
+    struct SendInputArgs : public SendInputArgsT<SendInputArgs>
+    {
+        PARTIAL_ACTION_ARG_BODY(SendInputArgs, SEND_INPUT_ARGS);
+
+        SendInputArgs(const winrt::hstring& input) :
+            SendInputArgs(input, 0u) {}
+
+    public:
+        hstring GenerateName() const
+        {
+            return GenerateName(GetLibraryResourceLoader().ResourceContext());
+        }
+        hstring GenerateName(const winrt::Windows::ApplicationModel::Resources::Core::ResourceContext& context) const;
+        bool Equals(const IActionArgs& other)
+        {
+            auto otherAsUs = other.try_as<SendInputArgs>();
+            if (otherAsUs)
+            {
+                return otherAsUs->_Input == _Input &&
+                       otherAsUs->_EnterDelayMs == _EnterDelayMs;
+            }
+            return false;
+        }
+        static FromJsonResult FromJson(const Json::Value& json)
+        {
+            auto args = winrt::make_self<SendInputArgs>();
+            SEND_INPUT_ARGS(FROM_JSON_ARGS);
+            return { *args, {} };
+        }
+        static Json::Value ToJson(const IActionArgs& val)
+        {
+            if (!val)
+            {
+                return {};
+            }
+            Json::Value json{ Json::ValueType::objectValue };
+            const auto args{ get_self<SendInputArgs>(val) };
+            SEND_INPUT_ARGS(TO_JSON_ARGS);
+            return json;
+        }
+        IActionArgs Copy() const
+        {
+            auto copy{ winrt::make_self<SendInputArgs>() };
+            SEND_INPUT_ARGS(COPY_ARGS);
+            return *copy;
+        }
+        size_t Hash() const
+        {
+            til::hasher h;
+            h.write(Input());
+            // Preserve legacy generated IDs for sendInput actions that don't
+            // opt into delayed Enter behavior.
+            if (EnterDelayMs() > 0)
+            {
+                h.write(EnterDelayMs());
+            }
+            return h.finalize();
+        }
+    };
 
     ACTION_ARGS_STRUCT(OpenSettingsArgs, OPEN_SETTINGS_ARGS);
 

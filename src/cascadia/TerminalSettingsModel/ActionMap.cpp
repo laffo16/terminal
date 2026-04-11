@@ -1114,7 +1114,11 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 
             const auto inArgs{ command.ActionAndArgs().Args().try_as<Model::SendInputArgs>() };
             const auto inputString{ inArgs ? inArgs.Input() : L"" };
-            auto args = winrt::make_self<SendInputArgs>(til::hstring_format(FMT_COMPILE(L"{:\x7f^{}}{}"), L"", numBackspaces, inputString));
+            const auto delayedEnterMs{ inArgs ? inArgs.EnterDelayMs() : 0u };
+            const auto rewrittenInput = til::hstring_format(FMT_COMPILE(L"{:\x7f^{}}{}"), L"", numBackspaces, inputString);
+            auto args = delayedEnterMs > 0 ?
+                            winrt::make_self<SendInputArgs>(rewrittenInput, delayedEnterMs) :
+                            winrt::make_self<SendInputArgs>(rewrittenInput);
             Model::ActionAndArgs actionAndArgs{ ShortcutAction::SendInput, *args };
 
             auto copy = cmdImpl->Copy();

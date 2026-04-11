@@ -127,6 +127,7 @@ private:
     std::vector<std::string> _sendInputText;
     bool _sendInputEscapes{ false };
     bool _sendInputEnter{ false };
+    uint32_t _sendInputEnterDelayMs{ 0 };
     std::string _saveInputName;
     std::string _keyChordOption;
     // Are you adding more args here? Make sure to reset them in _resetStateToDefault

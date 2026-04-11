@@ -31,6 +31,22 @@ namespace winrt
 
 namespace winrt::TerminalApp::implementation
 {
+    namespace
+    {
+        safe_void_coroutine _SendInputEnterAfterDelay(winrt::weak_ref<TermControl> weakControl, const CoreDispatcher dispatcher, const uint32_t enterDelayMs)
+        {
+            co_await winrt::resume_after(std::chrono::milliseconds{ enterDelayMs });
+            co_await wil::resume_foreground(dispatcher);
+
+            if (const auto termControl{ weakControl.get() })
+            {
+                // Delayed Enter is intentionally a second injection so clients can
+                // observe the text payload before submit.
+                termControl.SendInput(L"\r");
+            }
+        }
+    }
+
     TermControl TerminalPage::_senderOrActiveControl(const IInspectable& sender)
     {
         if (sender)
@@ -186,6 +202,10 @@ namespace winrt::TerminalApp::implementation
             if (const auto termControl{ _senderOrActiveControl(sender) })
             {
                 termControl.SendInput(realArgs.Input());
+                if (realArgs.EnterDelayMs() > 0)
+                {
+                    _SendInputEnterAfterDelay(winrt::weak_ref<TermControl>{ termControl }, termControl.Dispatcher(), realArgs.EnterDelayMs());
+                }
                 args.Handled(true);
             }
         }

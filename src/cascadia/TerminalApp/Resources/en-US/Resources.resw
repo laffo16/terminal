@@ -360,6 +360,9 @@
   <data name="CmdSendInputEnterDesc" xml:space="preserve">
     <value>Append a carriage return to the input</value>
   </data>
+  <data name="CmdSendInputEnterDelayDesc" xml:space="preserve">
+    <value>When used with --enter, delay the carriage return by the given number of milliseconds</value>
+  </data>
   <data name="CmdProfileArgDesc" xml:space="preserve">
     <value>Open with the given profile. Accepts either the name or GUID of a profile</value>
   </data>
