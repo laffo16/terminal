@@ -27,6 +27,7 @@ namespace SettingsModelUnitTests
         TEST_METHOD(ManyKeysSameAction);
         TEST_METHOD(LayerKeybindings);
         TEST_METHOD(HashDeduplication);
+        TEST_METHOD(DefaultArgSemanticDeduplication);
         TEST_METHOD(SendInputZeroDelayDeduplication);
         TEST_METHOD(SendInputDelayedEnterStaysDistinct);
         TEST_METHOD(HashContentArgs);
@@ -162,6 +163,26 @@ namespace SettingsModelUnitTests
         actionMap->LayerJson(VerifyParseSucceeded(R"([ { "command": "splitPane", "keys": ["ctrl+c"] } ])"), OriginTag::User);
         actionMap->LayerJson(VerifyParseSucceeded(R"([ { "command": "splitPane", "keys": ["ctrl+c"] } ])"), OriginTag::User);
         VERIFY_ARE_EQUAL(1u, actionMap->_ActionMap.size());
+    }
+
+    void KeyBindingsTests::DefaultArgSemanticDeduplication()
+    {
+        const auto actionMap = winrt::make_self<implementation::ActionMap>();
+        actionMap->LayerJson(VerifyParseSucceeded(R"([ { "command": "splitPane", "keys": ["ctrl+c"] } ])"), OriginTag::User);
+        actionMap->LayerJson(VerifyParseSucceeded(R"([ { "command": { "action": "splitPane" }, "keys": ["ctrl+shift+c"] } ])"), OriginTag::User);
+
+        VERIFY_ARE_EQUAL(1u, actionMap->_ActionMap.size());
+        VERIFY_ARE_EQUAL(2u, actionMap->_KeyMap.size());
+
+        KeyChord ctrlC{ VirtualKeyModifiers::Control, static_cast<int32_t>('C'), 0 };
+        KeyChord ctrlShiftC{ VirtualKeyModifiers::Control | VirtualKeyModifiers::Shift, static_cast<int32_t>('C'), 0 };
+
+        const auto cmd1 = actionMap->GetActionByKeyChord(ctrlC);
+        const auto cmd2 = actionMap->GetActionByKeyChord(ctrlShiftC);
+
+        VERIFY_IS_NOT_NULL(cmd1);
+        VERIFY_IS_NOT_NULL(cmd2);
+        VERIFY_ARE_EQUAL(cmd1.ID(), cmd2.ID());
     }
 
     void KeyBindingsTests::SendInputZeroDelayDeduplication()

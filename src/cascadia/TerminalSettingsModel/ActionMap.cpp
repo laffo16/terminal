@@ -67,8 +67,19 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             return false;
         }
 
-        const auto lhsArgs = lhs.Args();
-        const auto rhsArgs = rhs.Args();
+        const auto action = lhs.Action();
+        auto lhsArgs = lhs.Args();
+        auto rhsArgs = rhs.Args();
+
+        if (!lhsArgs)
+        {
+            lhsArgs = ActionArgFactory::GetEmptyArgsForAction(action);
+        }
+        if (!rhsArgs)
+        {
+            rhsArgs = ActionArgFactory::GetEmptyArgsForAction(action);
+        }
+
         if (!lhsArgs || !rhsArgs)
         {
             return !lhsArgs && !rhsArgs;
