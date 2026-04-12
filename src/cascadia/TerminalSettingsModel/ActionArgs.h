@@ -930,7 +930,11 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             }
             Json::Value json{ Json::ValueType::objectValue };
             const auto args{ get_self<SendInputArgs>(val) };
-            SEND_INPUT_ARGS(TO_JSON_ARGS);
+            JsonUtils::SetValueForKey(json, "input", args->_Input);
+            if (args->EnterDelayMs() > 0)
+            {
+                JsonUtils::SetValueForKey(json, "enterDelayMs", args->_EnterDelayMs);
+            }
             return json;
         }
         IActionArgs Copy() const
@@ -943,12 +947,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         {
             til::hasher h;
             h.write(Input());
-            // Preserve legacy generated IDs for sendInput actions that don't
-            // opt into delayed Enter behavior.
-            if (EnterDelayMs() > 0)
-            {
-                h.write(EnterDelayMs());
-            }
+            h.write(EnterDelayMs());
             return h.finalize();
         }
     };

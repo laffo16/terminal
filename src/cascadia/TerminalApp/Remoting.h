@@ -20,6 +20,8 @@ namespace winrt::TerminalApp::implementation
         int32_t ExitCode() const noexcept;
         winrt::hstring ExitMessage() const;
         winrt::hstring TargetWindow() const;
+        bool ActivateWindow() const noexcept;
+        void RetargetToNewWindow() noexcept;
 
         til::property<winrt::Microsoft::Terminal::TerminalConnection::ITerminalConnection> Connection;
         void Commandline(const winrt::array_view<const winrt::hstring>& value);

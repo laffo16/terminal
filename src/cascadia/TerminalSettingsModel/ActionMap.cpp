@@ -60,6 +60,23 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         return hasher.finalize();
     }
 
+    static bool _ActionAndArgsSemanticallyEqual(const Model::ActionAndArgs& lhs, const Model::ActionAndArgs& rhs)
+    {
+        if (lhs.Action() != rhs.Action())
+        {
+            return false;
+        }
+
+        const auto lhsArgs = lhs.Args();
+        const auto rhsArgs = rhs.Args();
+        if (!lhsArgs || !rhsArgs)
+        {
+            return !lhsArgs && !rhsArgs;
+        }
+
+        return lhsArgs.Equals(rhsArgs);
+    }
+
     winrt::hstring ActionArgFactory::GetNameForAction(Model::ShortcutAction action)
     {
         return GetNameForAction(action, GetLibraryResourceLoader().ResourceContext());
@@ -1218,7 +1235,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             if (const auto foundCmd{ _GetActionByID(newID) })
             {
                 const auto foundCmdActionAndArgs = foundCmd.ActionAndArgs();
-                if (foundCmdActionAndArgs != cmd.ActionAndArgs())
+                if (!_ActionAndArgsSemanticallyEqual(foundCmdActionAndArgs, cmd.ActionAndArgs()))
                 {
                     // we found a command that has the same ID as this one, but that command has different ActionAndArgs
                     // this means that foundCommand's action and/or args have been changed since its ID was generated,

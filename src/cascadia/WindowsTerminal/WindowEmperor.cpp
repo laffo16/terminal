@@ -676,6 +676,7 @@ void WindowEmperor::_dispatchCommandline(winrt::TerminalApp::CommandlineArgs arg
     }
     else
     {
+        args.RetargetToNewWindow();
         winrt::TerminalApp::WindowRequestedArgs request{ windowId, std::move(args) };
         request.WindowName(std::move(windowName));
         CreateNewWindow(std::move(request));
@@ -729,6 +730,7 @@ safe_void_coroutine WindowEmperor::_dispatchCommandlineCurrentDesktop(winrt::Ter
     }
     else
     {
+        args.RetargetToNewWindow();
         CreateNewWindow(winrt::TerminalApp::WindowRequestedArgs{ 0, std::move(args) });
     }
 }

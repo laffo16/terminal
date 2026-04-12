@@ -40,9 +40,20 @@ namespace winrt::TerminalApp::implementation
         return winrt::to_hstring(_parsed.GetTargetWindow());
     }
 
+    bool CommandlineArgs::ActivateWindow() const noexcept
+    {
+        return _parsed.ShouldActivateWindow();
+    }
+
+    void CommandlineArgs::RetargetToNewWindow() noexcept
+    {
+        _parsed.RetargetToNewWindow();
+    }
+
     void CommandlineArgs::Commandline(const winrt::array_view<const winrt::hstring>& value)
     {
         _args = { value.begin(), value.end() };
+        _parsed.FullResetState();
         _parseResult = _parsed.ParseArgs(_args);
     }
 

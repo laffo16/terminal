@@ -53,6 +53,7 @@ namespace SettingsModelUnitTests
         TEST_METHOD(RoundtripGenerateActionID);
         TEST_METHOD(SendInputZeroDelayPreservesGeneratedActionID);
         TEST_METHOD(SendInputDelayedEnterGetsDistinctGeneratedActionID);
+        TEST_METHOD(RoundtripSendInputEnterDelay);
         TEST_METHOD(NoGeneratedIDsForIterableAndNestedCommands);
         TEST_METHOD(GeneratedActionIDsEqualForIdenticalCommands);
         TEST_METHOD(RoundtripLegacyToModernActions);
@@ -1004,6 +1005,7 @@ namespace SettingsModelUnitTests
 
         std::string_view expectedID{ R"(User.sendInput.)" SEND_INPUT_ARCH_SPECIFIC_ACTION_HASH };
 
+        VERIFY_IS_NOT_NULL(sendInputCmd);
         VERIFY_ARE_EQUAL(sendInputCmd.ID(), winrt::to_hstring(expectedID));
     }
 
@@ -1046,6 +1048,8 @@ namespace SettingsModelUnitTests
         const auto legacySendInputCmd = legacySettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
         const auto explicitZeroDelaySendInputCmd = explicitZeroDelaySettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
 
+        VERIFY_IS_NOT_NULL(legacySendInputCmd);
+        VERIFY_IS_NOT_NULL(explicitZeroDelaySendInputCmd);
         VERIFY_ARE_EQUAL(legacySendInputCmd.ID(), explicitZeroDelaySendInputCmd.ID());
     }
 
@@ -1087,11 +1091,49 @@ namespace SettingsModelUnitTests
 
         const auto legacySendInputCmd = legacySettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
         const auto delayedEnterSendInputCmd = delayedEnterSettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
-        const auto delayedArgs = delayedEnterSendInputCmd.ActionAndArgs().Args().try_as<SendInputArgs>();
 
+        VERIFY_IS_NOT_NULL(legacySendInputCmd);
+        VERIFY_IS_NOT_NULL(delayedEnterSendInputCmd);
+        const auto delayedArgs = delayedEnterSendInputCmd.ActionAndArgs().Args().try_as<SendInputArgs>();
         VERIFY_IS_NOT_NULL(delayedArgs);
         VERIFY_ARE_NOT_EQUAL(legacySendInputCmd.ID(), delayedEnterSendInputCmd.ID());
         VERIFY_ARE_EQUAL(75u, delayedArgs.EnterDelayMs());
+    }
+
+    void SerializationTests::RoundtripSendInputEnterDelay()
+    {
+        static constexpr std::string_view delayedEnterSettingsJson{ R"(
+        {
+            "actions": [
+                {
+                    "name": "foo",
+                    "command": { "action": "sendInput", "input": "just some input", "enterDelayMs": 75 },
+                    "keys": "ctrl+shift+w"
+                }
+            ]
+        })" };
+
+        implementation::SettingsLoader loader{ delayedEnterSettingsJson, implementation::LoadStringResource(IDR_DEFAULTS) };
+        loader.MergeInboxIntoUserSettings();
+        loader.FinalizeLayering();
+        loader.FixupUserSettings();
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(std::move(loader));
+
+        const auto oldResult{ settings->ToJson() };
+
+        implementation::SettingsLoader roundtripLoader{ toString(oldResult), implementation::LoadStringResource(IDR_DEFAULTS) };
+        roundtripLoader.MergeInboxIntoUserSettings();
+        roundtripLoader.FinalizeLayering();
+        roundtripLoader.FixupUserSettings();
+        const auto roundtripSettings = winrt::make_self<implementation::CascadiaSettings>(std::move(roundtripLoader));
+        const auto newResult{ roundtripSettings->ToJson() };
+        const auto sendInputCmd = roundtripSettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
+
+        VERIFY_IS_NOT_NULL(sendInputCmd);
+        const auto delayedArgs = sendInputCmd.ActionAndArgs().Args().try_as<SendInputArgs>();
+        VERIFY_IS_NOT_NULL(delayedArgs);
+        VERIFY_ARE_EQUAL(75u, delayedArgs.EnterDelayMs());
+        VERIFY_ARE_EQUAL(toString(newResult), toString(oldResult));
     }
 
     void SerializationTests::NoGeneratedIDsForIterableAndNestedCommands()
@@ -1171,7 +1213,9 @@ namespace SettingsModelUnitTests
         const auto sendInputCmd1 = settings1->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
         const auto sendInputCmd2 = settings2->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
 
-        VERIFY_ARE_EQUAL(sendInputCmd1.ID(), sendInputCmd1.ID());
+        VERIFY_IS_NOT_NULL(sendInputCmd1);
+        VERIFY_IS_NOT_NULL(sendInputCmd2);
+        VERIFY_ARE_EQUAL(sendInputCmd1.ID(), sendInputCmd2.ID());
     }
 
     void SerializationTests::RoundtripLegacyToModernActions()

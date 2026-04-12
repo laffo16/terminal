@@ -582,6 +582,9 @@ void AppCommandlineArgs::_buildSendInputParser()
 {
     _sendInputCommand = _app.add_subcommand("send-input", RS_A(L"CmdSendInputDesc"));
 
+    _sendInputCommand->add_flag("--activate",
+                                _sendInputActivate,
+                                RS_A(L"CmdSendInputActivateDesc"));
     auto* enterOpt = _sendInputCommand->add_flag("--enter",
                                                  _sendInputEnter,
                                                  RS_A(L"CmdSendInputEnterDesc"));
@@ -600,6 +603,8 @@ void AppCommandlineArgs::_buildSendInputParser()
     _sendInputCommand->positionals_at_end(true);
 
     _sendInputCommand->callback([&, this]() {
+        _sendInputActivateRequested = _sendInputActivateRequested || _sendInputActivate;
+
         ActionAndArgs sendInputAction{};
         sendInputAction.Action(ShortcutAction::SendInput);
 
@@ -905,12 +910,15 @@ void AppCommandlineArgs::_resetStateToDefault()
     _sendInputEscapes = false;
     _sendInputEnter = false;
     _sendInputEnterDelayMs = 0;
+    _sendInputActivate = false;
     _loadPersistedLayoutIdx = -1;
 
     // DON'T clear _launchMode here! This will get called once for every
     // subcommand, so we don't want `wt -F new-tab ; split-pane` clearing out
     // the "global" fullscreen flag (-F).
     // Same with _windowTarget, _position and _size.
+    // Don't clear _sendInputActivateRequested here either.
+    // It is commandline-wide state, not per-subcommand state.
 }
 
 // Function Description:
@@ -1132,7 +1140,7 @@ bool AppCommandlineArgs::_targetsExistingWindow() const noexcept
         return *opt >= 0;
     }
 
-    return _windowTarget == "last";
+    return _windowTarget != "new";
 }
 
 bool AppCommandlineArgs::_canTargetExistingWindowWithoutNewTab() const noexcept
@@ -1302,6 +1310,7 @@ void AppCommandlineArgs::FullResetState()
     _startupActions.clear();
     _exitMessage = "";
     _shouldExitEarly = false;
+    _sendInputActivateRequested = false;
 
     _windowTarget = {};
 }
@@ -1309,4 +1318,44 @@ void AppCommandlineArgs::FullResetState()
 std::string_view AppCommandlineArgs::GetTargetWindow() const noexcept
 {
     return _windowTarget;
+}
+
+bool AppCommandlineArgs::ShouldActivateWindow() const noexcept
+{
+    if (!_targetsExistingWindow())
+    {
+        return true;
+    }
+
+    if (_sendInputActivateRequested)
+    {
+        return true;
+    }
+
+    auto hasSendInput = false;
+
+    for (const auto& actionAndArgs : _startupActions)
+    {
+        switch (actionAndArgs.Action())
+        {
+        case ShortcutAction::SendInput:
+            hasSendInput = true;
+            break;
+        case ShortcutAction::SwitchToTab:
+        case ShortcutAction::NextTab:
+        case ShortcutAction::PrevTab:
+        case ShortcutAction::MoveFocus:
+        case ShortcutAction::FocusPane:
+            break;
+        default:
+            return true;
+        }
+    }
+
+    return !hasSendInput;
+}
+
+void AppCommandlineArgs::RetargetToNewWindow() noexcept
+{
+    _windowTarget.clear();
 }

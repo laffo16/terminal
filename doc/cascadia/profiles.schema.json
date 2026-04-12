@@ -1108,6 +1108,12 @@
               "type": "string",
               "default": "",
               "description": "The text input to feed into the shell. ANSI escape sequences may be used. Escape codes like \\x1b must be written as \\u001b."
+            },
+            "enterDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Delay the trailing Enter key by the given number of milliseconds when the input should be submitted after a short pause."
             }
           }
         }

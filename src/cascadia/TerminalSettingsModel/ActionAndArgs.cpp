@@ -78,6 +78,7 @@ static constexpr std::string_view DisplayWorkingDirectoryKey{ "debugTerminalCwd"
 static constexpr std::string_view SearchForTextKey{ "searchWeb" };
 static constexpr std::string_view GlobalSummonKey{ "globalSummon" };
 static constexpr std::string_view QuakeModeKey{ "quakeMode" };
+
 static constexpr std::string_view FocusPaneKey{ "focusPane" };
 static constexpr std::string_view OpenSystemMenuKey{ "openSystemMenu" };
 static constexpr std::string_view ExportBufferKey{ "exportBuffer" };
@@ -110,6 +111,25 @@ static constexpr std::string_view UnboundKey{ "unbound" };
 namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 {
     using namespace ::Microsoft::Terminal::Settings::Model;
+
+    static uint64_t _GeneratedArgsHash(const ShortcutAction action, const IActionArgs& args)
+    {
+        if (action == ShortcutAction::SendInput)
+        {
+            if (const auto sendInputArgs = args.try_as<winrt::Microsoft::Terminal::Settings::Model::SendInputArgs>())
+            {
+                til::hasher h;
+                h.write(sendInputArgs.Input());
+                if (sendInputArgs.EnterDelayMs() > 0)
+                {
+                    h.write(sendInputArgs.EnterDelayMs());
+                }
+                return h.finalize();
+            }
+        }
+
+        return args.Hash();
+    }
 
     using ParseActionFunction = FromJsonResult (*)(const Json::Value&);
     using SerializeActionFunction = Json::Value (*)(const IActionArgs&);
@@ -379,7 +399,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
                 // 2. convert it to a hex string
                 // there is a _tiny_ chance of collision because of the truncate but unlikely for
                 // the number of commands a user is expected to have
-                const auto argsHash32 = static_cast<uint32_t>(_Args.Hash() & 0xFFFFFFFF);
+                const auto argsHash32 = static_cast<uint32_t>(_GeneratedArgsHash(_Action, _Args) & 0xFFFFFFFF);
                 // {0:X} formats the truncated hash to an uppercase hex string
                 fmt::format_to(std::back_inserter(result), FMT_COMPILE(L".{:X}"), argsHash32);
             }

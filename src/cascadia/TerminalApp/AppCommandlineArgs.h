@@ -48,6 +48,8 @@ public:
     void FullResetState();
 
     std::string_view GetTargetWindow() const noexcept;
+    bool ShouldActivateWindow() const noexcept;
+    void RetargetToNewWindow() noexcept;
 
 private:
     static const std::wregex _commandDelimiterRegex;
@@ -128,6 +130,7 @@ private:
     bool _sendInputEscapes{ false };
     bool _sendInputEnter{ false };
     uint32_t _sendInputEnterDelayMs{ 0 };
+    bool _sendInputActivate{ false };
     std::string _saveInputName;
     std::string _keyChordOption;
     // Are you adding more args here? Make sure to reset them in _resetStateToDefault
@@ -139,6 +142,7 @@ private:
     std::vector<winrt::Microsoft::Terminal::Settings::Model::ActionAndArgs> _startupActions;
     std::string _exitMessage;
     bool _shouldExitEarly{ false };
+    bool _sendInputActivateRequested{ false };
 
     int _loadPersistedLayoutIdx{};
     std::string _windowTarget{};
