@@ -51,6 +51,10 @@ wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 "Please reply ex
 wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 -- "/quit"
 ```
 
+## Upstream README
+
+The original upstream Windows Terminal README continues below.
+
 <details>
   <summary><strong>Table of Contents</strong></summary>
 
