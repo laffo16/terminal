@@ -1,22 +1,15 @@
 # Local Automation Patches
 
-This fork of Windows Terminal exists to support trusted local automation workflows on the maintainer's own machine. It is not positioned as an upstream-approved security model and it is not intended to be a general remote-control distribution of Windows Terminal.
+This fork of Windows Terminal exists to support trusted local automation workflows in developer-controlled environments. It is not positioned as an upstream-approved security model and it is not intended to be a general remote-control distribution of Windows Terminal.
 
 ## Why This Fork Exists
 
-Stock Windows Terminal does not provide a public command-line surface for sending text into an already running terminal window. This fork adds that missing control surface so local helper tools can:
+Stock Windows Terminal does not provide a public command-line surface for sending text into an already running terminal window. This fork adds that missing control surface so automation callers can:
 
 - send text into an existing Windows Terminal window
 - optionally press Enter after the text
 - delay Enter for TUIs like Codex that need a short settle gap
 - target a specific existing WT window deterministically
-
-This fork is currently used by local tools such as:
-
-- `tools/codex-terminal-restart`
-- `tools/codex-wakeup`
-
-Those tools rely on this fork for input delivery while using separate state/intelligence layers for session tracking.
 
 ## What This Fork Adds
 
@@ -98,7 +91,7 @@ wt.exe -w <target> send-input [--escape] [--enter] [--enter-delay-ms <ms>] [--ac
 - explicit typed selectors fail closed if the target does not resolve
 - explicit typed selectors are the preferred deterministic targeting surface for automation
 - helper-side discovery still happens outside WT
-- Codex-oriented workflows on this machine currently use `--enter-delay-ms 200`
+- Codex-oriented workflows commonly benefit from `--enter-delay-ms 200`
 
 ## Examples
 
@@ -131,8 +124,8 @@ wt.exe -w name:codexdev send-input --enter "echo READY"
 This fork is intended for:
 
 - trusted local automation
-- personal-machine workflows
-- helper tools that already identify the intended WT window explicitly
+- developer-controlled workflows
+- callers that already identify the intended WT window explicitly
 
 It is not intended as a blanket answer to upstream terminal automation for arbitrary local applications.
 
@@ -148,7 +141,7 @@ This fork remains valuable locally because:
 
 - it proves the workflow
 - it provides a concrete command surface
-- it supports real automation used by the maintainer's tools
+- it supports real automation use cases in a trusted local environment
 
 ## Building This Fork
 
@@ -168,7 +161,7 @@ Example from this fork's current working flow:
 
 ```powershell
 & 'C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe' `
-  'C:\git\sandbox\projects\windows-terminal\OpenConsole.slnx' `
+  '<repo-root>\OpenConsole.slnx' `
   /p:Configuration=Release `
   /p:Platform=x64 `
   /p:WindowsTerminalBranding=Release `
@@ -181,14 +174,13 @@ Example from this fork's current working flow:
 ### Register the locally built package
 
 ```powershell
-powershell.exe -NoProfile -Command "Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Register 'C:\git\sandbox\projects\windows-terminal\src\cascadia\CascadiaPackage\bin\x64\Release\AppxManifest.xml'"
+powershell.exe -NoProfile -Command "Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Register '<repo-root>\src\cascadia\CascadiaPackage\bin\x64\Release\AppxManifest.xml>'"
 ```
 
 After registration, `wt.exe` on that machine will use the locally registered build.
 
 ## Notes For Maintainers Of This Fork
 
-- The automation-grade target identity currently used by local tools is `hwnd:0x...`.
+- The preferred automation-grade target identity is `hwnd:0x...`.
 - Helper-side discovery still happens outside WT; this fork focuses on deterministic write targeting.
-- Codex-oriented tools on this machine currently use `--enter-delay-ms 200` as the safe default for prompt submission.
-- For more detailed local notes, see `C:\git\sandbox\research\windows-terminal.md`.
+- Codex-oriented prompt flows commonly use `--enter-delay-ms 200` as a safe starting point.
