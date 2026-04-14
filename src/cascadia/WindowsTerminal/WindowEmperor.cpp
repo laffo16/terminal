@@ -108,6 +108,72 @@ static const uint8_t* deserializeString(const uint8_t* it, const uint8_t* end, w
     return it + bytes;
 }
 
+static bool _isExplicitWindowTarget(std::wstring_view target) noexcept
+{
+    return til::starts_with_insensitive_ascii(target, L"hwnd:") ||
+           til::starts_with_insensitive_ascii(target, L"id:") ||
+           til::starts_with_insensitive_ascii(target, L"name:");
+}
+
+static bool _tryParseExplicitWindowId(std::wstring_view target, uint64_t& windowId) noexcept
+{
+    constexpr std::wstring_view prefix{ L"id:" };
+    if (!til::starts_with_insensitive_ascii(target, prefix))
+    {
+        return false;
+    }
+
+    const auto suffix = target.substr(prefix.size());
+    if (const auto parsed = til::parse_signed<int64_t>(suffix, 10))
+    {
+        if (*parsed > 0)
+        {
+            windowId = gsl::narrow_cast<uint64_t>(*parsed);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool _tryParseExplicitWindowHandle(std::wstring_view target, HWND& windowHandle) noexcept
+{
+    constexpr std::wstring_view prefix{ L"hwnd:" };
+    if (!til::starts_with_insensitive_ascii(target, prefix))
+    {
+        return false;
+    }
+
+    auto suffix = target.substr(prefix.size());
+    auto radix = 10;
+    if (til::starts_with_insensitive_ascii(suffix, L"0x"))
+    {
+        suffix = suffix.substr(2);
+        radix = 16;
+    }
+
+    if (const auto parsed = til::parse_unsigned<uint64_t>(suffix, radix))
+    {
+        windowHandle = reinterpret_cast<HWND>(static_cast<uintptr_t>(*parsed));
+        return windowHandle != nullptr;
+    }
+
+    return false;
+}
+
+static bool _tryParseExplicitWindowName(std::wstring_view target, winrt::hstring& windowName) noexcept
+{
+    constexpr std::wstring_view prefix{ L"name:" };
+    if (!til::starts_with_insensitive_ascii(target, prefix))
+    {
+        return false;
+    }
+
+    const auto suffix = target.substr(prefix.size());
+    windowName = winrt::hstring{ suffix };
+    return !windowName.empty();
+}
+
 struct Handoff
 {
     wil::zwstring_view args;
@@ -238,6 +304,20 @@ AppHost* WindowEmperor::GetWindowByName(std::wstring_view name) const noexcept
     for (const auto& window : _windows)
     {
         if (window->Logic().WindowProperties().WindowName() == name)
+        {
+            return window.get();
+        }
+    }
+    return nullptr;
+}
+
+AppHost* WindowEmperor::GetWindowByHandle(HWND hwnd) const noexcept
+{
+    _assertIsMainThread();
+
+    for (const auto& window : _windows)
+    {
+        if (const auto* hostWindow = window->GetWindow(); hostWindow && hostWindow->GetHandle() == hwnd)
         {
             return window.get();
         }
@@ -614,13 +694,35 @@ void WindowEmperor::_dispatchCommandline(winrt::TerminalApp::CommandlineArgs arg
     const auto parsedTarget = args.TargetWindow();
     WindowingMode windowingBehavior = WindowingMode::UseNew;
     uint64_t windowId = 0;
+    HWND windowHandle = nullptr;
     winrt::hstring windowName;
+    bool explicitTargetRequested = false;
 
     // Figure out the windowing behavior the caller wants
     // and get the sanitized window ID (if any) and window name (if any).
     if (parsedTarget.empty())
     {
         windowingBehavior = _app.Logic().Settings().GlobalSettings().WindowingBehavior();
+    }
+    else if (_tryParseExplicitWindowHandle(parsedTarget, windowHandle))
+    {
+        // Explicit HWND target.
+        explicitTargetRequested = true;
+    }
+    else if (_tryParseExplicitWindowId(parsedTarget, windowId))
+    {
+        // Explicit window ID target.
+        explicitTargetRequested = true;
+    }
+    else if (_tryParseExplicitWindowName(parsedTarget, windowName))
+    {
+        // Explicit window name target.
+        explicitTargetRequested = true;
+    }
+    else if (_isExplicitWindowTarget(parsedTarget))
+    {
+        // Explicit selector syntax should fail closed if it does not parse.
+        explicitTargetRequested = true;
     }
     else if (const auto opt = til::parse_signed<int64_t>(parsedTarget, 10))
     {
@@ -647,7 +749,11 @@ void WindowEmperor::_dispatchCommandline(winrt::TerminalApp::CommandlineArgs arg
     AppHost* window = nullptr;
 
     // Map from the windowing behavior, ID, and name to a window.
-    if (windowId)
+    if (windowHandle)
+    {
+        window = GetWindowByHandle(windowHandle);
+    }
+    else if (windowId)
     {
         window = GetWindowById(windowId);
     }
@@ -673,6 +779,12 @@ void WindowEmperor::_dispatchCommandline(winrt::TerminalApp::CommandlineArgs arg
     if (window)
     {
         window->DispatchCommandline(std::move(args));
+    }
+    else if (explicitTargetRequested)
+    {
+        // Explicit external selectors are an automation contract. If the target
+        // does not resolve, fail closed instead of creating a new window.
+        return;
     }
     else
     {

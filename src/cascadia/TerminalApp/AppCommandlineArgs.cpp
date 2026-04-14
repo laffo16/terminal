@@ -50,6 +50,30 @@ namespace
 
         return winrt::to_hstring(rawInput);
     }
+
+    bool _isExplicitExistingWindowTarget(const std::string& target) noexcept
+    {
+        if (target.empty())
+        {
+            return false;
+        }
+
+        if (target.size() > 5)
+        {
+            const std::string_view targetView{ target };
+            if (targetView.starts_with("hwnd:") ||
+                targetView.starts_with("HWND:") ||
+                targetView.starts_with("id:") ||
+                targetView.starts_with("ID:") ||
+                targetView.starts_with("name:") ||
+                targetView.starts_with("NAME:"))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 
 AppCommandlineArgs::AppCommandlineArgs()
@@ -1133,6 +1157,11 @@ bool AppCommandlineArgs::_targetsExistingWindow() const noexcept
     if (_windowTarget.empty())
     {
         return false;
+    }
+
+    if (_isExplicitExistingWindowTarget(_windowTarget))
+    {
+        return true;
     }
 
     if (const auto opt = til::parse_signed<int64_t>(_windowTarget, 10))

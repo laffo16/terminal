@@ -1653,6 +1653,36 @@ namespace TerminalAppLocalTests
         }
         {
             AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"-w", L"hwnd:0x1234", L"send-input", L"hello" };
+            _buildCommandlinesHelper(appArgs, 1u, rawCommands);
+
+            VERIFY_ARE_EQUAL(1u, appArgs._startupActions.size());
+            VERIFY_IS_FALSE(appArgs.ShouldActivateWindow());
+            VERIFY_ARE_EQUAL(std::string{ "hwnd:0x1234" }, std::string{ appArgs.GetTargetWindow() });
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, appArgs._startupActions.at(0).Action());
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"-w", L"id:7", L"send-input", L"hello" };
+            _buildCommandlinesHelper(appArgs, 1u, rawCommands);
+
+            VERIFY_ARE_EQUAL(1u, appArgs._startupActions.size());
+            VERIFY_IS_FALSE(appArgs.ShouldActivateWindow());
+            VERIFY_ARE_EQUAL(std::string{ "id:7" }, std::string{ appArgs.GetTargetWindow() });
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, appArgs._startupActions.at(0).Action());
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"-w", L"name:123", L"send-input", L"hello" };
+            _buildCommandlinesHelper(appArgs, 1u, rawCommands);
+
+            VERIFY_ARE_EQUAL(1u, appArgs._startupActions.size());
+            VERIFY_IS_FALSE(appArgs.ShouldActivateWindow());
+            VERIFY_ARE_EQUAL(std::string{ "name:123" }, std::string{ appArgs.GetTargetWindow() });
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, appArgs._startupActions.at(0).Action());
+        }
+        {
+            AppCommandlineArgs appArgs{};
             std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"-w", L"last", L"send-input", L"hello" };
             _buildCommandlinesHelper(appArgs, 1u, rawCommands);
 
@@ -1760,6 +1790,33 @@ namespace TerminalAppLocalTests
 
             VERIFY_ARE_EQUAL(0, remotingArgs.ExitCode());
             VERIFY_ARE_EQUAL(winrt::hstring{ L"namedWindow" }, remotingArgs.TargetWindow());
+            VERIFY_IS_FALSE(remotingArgs.ActivateWindow());
+        }
+        {
+            CommandlineArgs remotingArgs{};
+            const std::array<hstring, 5> rawCommands{ L"wt.exe", L"-w", L"hwnd:0x1234", L"send-input", L"hello" };
+            remotingArgs.Commandline(rawCommands);
+
+            VERIFY_ARE_EQUAL(0, remotingArgs.ExitCode());
+            VERIFY_ARE_EQUAL(winrt::hstring{ L"hwnd:0x1234" }, remotingArgs.TargetWindow());
+            VERIFY_IS_FALSE(remotingArgs.ActivateWindow());
+        }
+        {
+            CommandlineArgs remotingArgs{};
+            const std::array<hstring, 5> rawCommands{ L"wt.exe", L"-w", L"id:7", L"send-input", L"hello" };
+            remotingArgs.Commandline(rawCommands);
+
+            VERIFY_ARE_EQUAL(0, remotingArgs.ExitCode());
+            VERIFY_ARE_EQUAL(winrt::hstring{ L"id:7" }, remotingArgs.TargetWindow());
+            VERIFY_IS_FALSE(remotingArgs.ActivateWindow());
+        }
+        {
+            CommandlineArgs remotingArgs{};
+            const std::array<hstring, 5> rawCommands{ L"wt.exe", L"-w", L"name:123", L"send-input", L"hello" };
+            remotingArgs.Commandline(rawCommands);
+
+            VERIFY_ARE_EQUAL(0, remotingArgs.ExitCode());
+            VERIFY_ARE_EQUAL(winrt::hstring{ L"name:123" }, remotingArgs.TargetWindow());
             VERIFY_IS_FALSE(remotingArgs.ActivateWindow());
         }
         {

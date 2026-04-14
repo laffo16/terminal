@@ -33,6 +33,7 @@ public:
     HWND GetMainWindow() const noexcept;
     AppHost* GetWindowById(uint64_t id) const noexcept;
     AppHost* GetWindowByName(std::wstring_view name) const noexcept;
+    AppHost* GetWindowByHandle(HWND hwnd) const noexcept;
     void CreateNewWindow(winrt::TerminalApp::WindowRequestedArgs args);
     void HandleCommandlineArgs(int nCmdShow);
 
