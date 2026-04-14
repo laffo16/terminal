@@ -14,6 +14,43 @@
 > - local build/install steps
 > - upstream status and security-model notes
 
+## Fork Command Summary
+
+This fork adds:
+
+```powershell
+wt.exe -w <target> send-input [--escape] [--enter] [--enter-delay-ms <ms>] [--activate] -- <text>
+```
+
+Supported explicit existing-window selectors:
+
+- `-w hwnd:0x<HWND>`
+- `-w id:<window-id>`
+- `-w name:<window-name>`
+
+Parameter summary:
+
+- `send-input`
+  - send text to the active pane in the targeted context
+- `--escape`
+  - interpret the input text as escaped sequences such as `\u0015`
+- `--enter`
+  - press Enter after the text
+- `--enter-delay-ms <ms>`
+  - wait before pressing Enter; useful for TUIs like Codex
+- `--activate`
+  - opt back into foreground activation for the target window
+- `--`
+  - stop option parsing so slash-leading input like `/quit` is treated as text
+
+Quick examples:
+
+```powershell
+wt.exe -w hwnd:0x123456 send-input --enter "echo READY"
+wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 "Please reply exactly with TEST_OK."
+wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 -- "/quit"
+```
+
 <details>
   <summary><strong>Table of Contents</strong></summary>
 

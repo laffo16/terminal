@@ -49,6 +49,57 @@ These selectors are intended for automation callers that already know the exact 
 
 Explicit selectors fail closed if they do not resolve. They do not silently create a new WT window.
 
+## Command Reference
+
+### Primary command shape
+
+```powershell
+wt.exe -w <target> send-input [--escape] [--enter] [--enter-delay-ms <ms>] [--activate] -- <text>
+```
+
+### Parameters
+
+- `send-input`
+  - sends text to the active pane in the targeted command context
+- `--escape`
+  - treats the provided text as escaped sequences
+  - useful for control characters such as `\u0015`
+- `--enter`
+  - sends Enter after the text
+- `--enter-delay-ms <ms>`
+  - delays Enter submission
+  - primarily intended for TUIs like Codex that need a short gap between text and submit
+- `--activate`
+  - opts back into normal foreground activation behavior
+  - existing-window `send-input` otherwise stays background by default
+- `--`
+  - ends option parsing so command text such as `/quit` is treated as literal input
+
+### Target selectors
+
+- `-w 0`
+  - follows WT's normal "current existing window" behavior
+  - convenient for quick local tests, but not the preferred automation selector
+- `-w last`
+  - WT's most recently used existing-window selector
+- `-w <name>`
+  - target a named WT window
+- `-w <id>`
+  - target WT's internal numeric window ID
+- `-w hwnd:0x<HWND>`
+  - preferred automation-grade selector when a helper already knows the exact WT handle
+- `-w id:<window-id>`
+  - explicit typed form of the WT numeric window ID
+- `-w name:<window-name>`
+  - explicit typed form of the WT window name
+
+### Behavior notes
+
+- explicit typed selectors fail closed if the target does not resolve
+- explicit typed selectors are the preferred deterministic targeting surface for automation
+- helper-side discovery still happens outside WT
+- Codex-oriented workflows on this machine currently use `--enter-delay-ms 200`
+
 ## Examples
 
 ### Normal shell command
