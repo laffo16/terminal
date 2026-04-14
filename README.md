@@ -4,6 +4,16 @@
 
 # Welcome to the Windows Terminal, Console and Command-Line repo
 
+> [!IMPORTANT]
+> This fork includes local automation-focused patches that are not part of upstream Windows Terminal. In particular, it adds a `wt send-input` command and explicit typed existing-window selectors such as `-w hwnd:0x...` for trusted local automation workflows on the maintainer's own machine.
+>
+> See [LOCAL_AUTOMATION_PATCHES.md](./LOCAL_AUTOMATION_PATCHES.md) for:
+> - what this fork changes
+> - why the fork exists
+> - current command examples
+> - local build/install steps
+> - upstream status and security-model notes
+
 <details>
   <summary><strong>Table of Contents</strong></summary>
 
