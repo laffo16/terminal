@@ -209,7 +209,7 @@ static ListWindowsQuery _tryParseListWindowsQuery(const std::vector<winrt::hstri
 
     for (size_t index = 2; index < args.size(); ++index)
     {
-        error = L"wt list-windows does not accept any flags. It always writes JSON to stdout.";
+        error = L"wt list-windows does not accept any arguments.";
         result.State = ListWindowsQueryParseState::Invalid;
         return result;
     }
