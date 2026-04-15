@@ -67,10 +67,10 @@ Notes:
 New query action:
 
 ```powershell
-wt.exe list-windows --json --output <path>
+wt.exe list-windows
 ```
 
-This writes a JSON inventory of running WT windows to the provided path. The `--output` form is the reliable option for the packaged `wt.exe` alias.
+This writes a JSON inventory of running WT windows to stdout.
 
 Current empty result:
 
@@ -95,7 +95,7 @@ Current per-window JSON fields:
 
 ```powershell
 wt.exe -w <target> send-input [--escape] [--enter] [--enter-delay-ms <ms>] [--activate] -- <text>
-wt.exe list-windows --json --output <path>
+wt.exe list-windows
 ```
 
 ### Parameters
@@ -115,9 +115,8 @@ wt.exe list-windows --json --output <path>
   - existing-window `send-input` otherwise stays background by default
 - `--`
   - ends option parsing so command text such as `/quit` is treated as literal input
-- `list-windows --json --output <path>`
-  - writes the current WT window inventory as JSON
-  - intended for reliable external discovery from the packaged `wt.exe` alias
+- `list-windows`
+  - writes the current WT window inventory as JSON to stdout
 
 ### Target selectors
 
@@ -142,7 +141,7 @@ wt.exe list-windows --json --output <path>
 - explicit typed selectors fail closed if the target does not resolve
 - explicit typed selectors are the preferred deterministic targeting surface for automation
 - current-shell discovery can now use `WT_WINDOW_SELECTOR`
-- external discovery can now use `wt list-windows --json --output <path>`
+- external discovery can now use `wt list-windows`
 - Codex-oriented workflows commonly benefit from `--enter-delay-ms 200`
 
 ## Examples
@@ -181,15 +180,13 @@ $env:WT_WINDOW_SELECTOR
 ### Window inventory to JSON
 
 ```powershell
-wt.exe list-windows --json --output C:\temp\wt-windows.json
-Get-Content C:\temp\wt-windows.json -Raw
+wt.exe list-windows
 ```
 
 ### Discover, choose, then target
 
 ```powershell
-wt.exe list-windows --json --output C:\temp\wt-windows.json
-$windows = (Get-Content C:\temp\wt-windows.json -Raw | ConvertFrom-Json).windows
+$windows = (wt.exe list-windows | ConvertFrom-Json).windows
 $focused = $windows | Where-Object isFocused | Select-Object -First 1
 wt.exe -w $focused.selector send-input --enter "echo READY"
 ```
@@ -203,8 +200,7 @@ $env:WT_WINDOW_SELECTOR
 ### Window inventory to JSON
 
 ```powershell
-wt.exe list-windows --json --output C:\temp\wt-windows.json
-Get-Content C:\temp\wt-windows.json -Raw
+wt.exe list-windows
 ```
 
 ## Intended Use
@@ -271,5 +267,5 @@ After registration, `wt.exe` on that machine will use the locally registered bui
 
 - The preferred automation-grade target identity is `hwnd:0x...`.
 - The preferred current-shell identity is `WT_WINDOW_SELECTOR`.
-- The preferred external inventory path is `wt list-windows --json --output <path>`.
+- The preferred external inventory path is `wt list-windows`.
 - Codex-oriented prompt flows commonly use `--enter-delay-ms 200` as a safe starting point.

@@ -197,7 +197,6 @@ enum class ListWindowsQueryParseState : uint8_t
 struct ListWindowsQuery
 {
     ListWindowsQueryParseState State{ ListWindowsQueryParseState::NotQuery };
-    std::wstring OutputPath;
 };
 
 static ListWindowsQuery _tryParseListWindowsQuery(const std::vector<winrt::hstring>& args, std::wstring& error) noexcept
@@ -208,47 +207,9 @@ static ListWindowsQuery _tryParseListWindowsQuery(const std::vector<winrt::hstri
         return result;
     }
 
-    auto jsonSeen = false;
-    auto outputSeen = false;
-
     for (size_t index = 2; index < args.size(); ++index)
     {
-        const auto& arg = args[index];
-        if (til::equals_insensitive_ascii(arg, L"--json"))
-        {
-            if (jsonSeen)
-            {
-                error = L"wt list-windows received --json more than once.";
-                result.State = ListWindowsQueryParseState::Invalid;
-                return result;
-            }
-
-            jsonSeen = true;
-            continue;
-        }
-
-        if (til::equals_insensitive_ascii(arg, L"--output"))
-        {
-            if (outputSeen)
-            {
-                error = L"wt list-windows received --output more than once.";
-                result.State = ListWindowsQueryParseState::Invalid;
-                return result;
-            }
-
-            if (++index >= args.size())
-            {
-                error = L"wt list-windows requires a path after --output.";
-                result.State = ListWindowsQueryParseState::Invalid;
-                return result;
-            }
-
-            result.OutputPath.assign(args[index]);
-            outputSeen = true;
-            continue;
-        }
-
-        error = L"wt list-windows only supports optional --json and --output <path> flags.";
+        error = L"wt list-windows does not accept any flags. It always writes JSON to stdout.";
         result.State = ListWindowsQueryParseState::Invalid;
         return result;
     }
@@ -263,21 +224,6 @@ static void _writeTextToStdHandle(const DWORD handleId, const std::string& text)
     {
         DWORD written = 0;
         WriteFile(handle, text.data(), gsl::narrow_cast<DWORD>(text.size()), &written, nullptr);
-    }
-}
-
-static void _writeUtf8TextToFile(std::wstring_view path, const std::string& text)
-{
-    std::ofstream stream{ std::filesystem::path{ path }, std::ios::binary | std::ios::trunc };
-    if (!stream)
-    {
-        throw std::runtime_error("Unable to open list-windows output path.");
-    }
-
-    stream.write(text.data(), gsl::narrow_cast<std::streamsize>(text.size()));
-    if (!stream)
-    {
-        throw std::runtime_error("Unable to write list-windows output.");
     }
 }
 
@@ -710,26 +656,12 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
             const auto alternateClassName = !IsPackaged() && packagedWindowClassName != windowClassName ? packagedWindowClassName.c_str() : nullptr;
             if (const auto response = _queryListWindowsFromExistingInstance(windowClassName.c_str(), alternateClassName))
             {
-                if (!listWindowsQuery.OutputPath.empty())
-                {
-                    _writeUtf8TextToFile(listWindowsQuery.OutputPath, *response + "\n");
-                }
-                else
-                {
-                    _writeTextToStdHandle(STD_OUTPUT_HANDLE, *response + "\n");
-                }
+                _writeTextToStdHandle(STD_OUTPUT_HANDLE, *response + "\n");
                 ExitProcess(0);
             }
 
             const auto emptyResponse = std::string{ R"({"windows":[]})" } + "\n";
-            if (!listWindowsQuery.OutputPath.empty())
-            {
-                _writeUtf8TextToFile(listWindowsQuery.OutputPath, emptyResponse);
-            }
-            else
-            {
-                _writeTextToStdHandle(STD_OUTPUT_HANDLE, emptyResponse);
-            }
+            _writeTextToStdHandle(STD_OUTPUT_HANDLE, emptyResponse);
             ExitProcess(0);
         }
         catch (...)
