@@ -117,6 +117,7 @@ wt.exe list-windows
   - ends option parsing so command text such as `/quit` is treated as literal input
 - `list-windows`
   - writes the current WT window inventory as JSON to stdout
+  - rejects extra flags on stderr and returns a non-zero exit code
 
 ### Target selectors
 

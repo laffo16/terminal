@@ -46,6 +46,7 @@ Parameter summary:
   - stop option parsing so slash-leading input like `/quit` is treated as text
 - `list-windows`
   - write a JSON inventory of running WT windows to stdout
+  - reject extra flags on stderr and return a non-zero exit code
 
 Patched shell env vars:
 

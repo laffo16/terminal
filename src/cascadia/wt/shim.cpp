@@ -67,5 +67,23 @@ int __stdcall wWinMain(HINSTANCE, HINSTANCE, LPWSTR pCmdLine, int)
 
     // Go!
     wil::unique_process_information pi;
-    return !CreateProcessW(module.c_str(), cmdline.data(), nullptr, nullptr, forwardStdHandles, 0, nullptr, nullptr, &si, &pi);
+    if (!CreateProcessW(module.c_str(), cmdline.data(), nullptr, nullptr, forwardStdHandles, 0, nullptr, nullptr, &si, &pi))
+    {
+        return 1;
+    }
+
+    if (forwardStdHandles)
+    {
+        WaitForSingleObject(pi.hProcess, INFINITE);
+
+        DWORD exitCode = 0;
+        if (!GetExitCodeProcess(pi.hProcess, &exitCode))
+        {
+            return 1;
+        }
+
+        return static_cast<int>(exitCode);
+    }
+
+    return 0;
 }
