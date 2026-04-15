@@ -7,7 +7,7 @@ $script:OpenConsoleFallbackRoot="$PSScriptRoot\.."
 # Finds the root of the current Terminal checkout.
 function Find-OpenConsoleRoot
 {
-    $root = (git rev-parse --show-toplevel 2>$null)
+    $root = (git -C $script:OpenConsoleFallbackRoot rev-parse --show-toplevel 2>$null)
     If ($?) {
         return $root
     }
