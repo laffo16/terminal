@@ -42,6 +42,10 @@ namespace winrt::TerminalApp::implementation
         void WindowName(const winrt::hstring& value);
         uint64_t WindowId() const noexcept;
         void WindowId(const uint64_t& value);
+        winrt::hstring WindowHwnd() const noexcept;
+        void WindowHwnd(const winrt::hstring& value);
+        winrt::hstring WindowSelector() const noexcept;
+        void WindowSelector(const winrt::hstring& value);
         winrt::hstring WindowIdForDisplay() const noexcept;
         winrt::hstring WindowNameForDisplay() const noexcept;
         bool IsQuakeWindow() const noexcept;
@@ -59,6 +63,8 @@ namespace winrt::TerminalApp::implementation
     private:
         winrt::hstring _WindowName{};
         uint64_t _WindowId{ 0 };
+        winrt::hstring _WindowHwnd{};
+        winrt::hstring _WindowSelector{};
     };
 
     struct TerminalWindow : TerminalWindowT<TerminalWindow, IInitializeWithWindow>
@@ -112,6 +118,7 @@ namespace winrt::TerminalApp::implementation
 
         Windows::UI::Xaml::UIElement GetRoot() noexcept;
         winrt::Windows::Foundation::Collections::IVector<IPaneContent> Panes() const;
+        uint32_t NumberOfTabs();
 
         hstring Title();
         void TitlebarClicked();
@@ -138,6 +145,8 @@ namespace winrt::TerminalApp::implementation
 
         void WindowName(const winrt::hstring& value);
         void WindowId(const uint64_t& value);
+        void WindowHwnd(const winrt::hstring& value);
+        void WindowSelector(const winrt::hstring& value);
 
         bool IsQuakeWindow() const noexcept { return _WindowProperties->IsQuakeWindow(); }
         TerminalApp::WindowProperties WindowProperties() { return *_WindowProperties; }

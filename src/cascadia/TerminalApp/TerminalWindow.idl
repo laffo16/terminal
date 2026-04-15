@@ -64,6 +64,7 @@ namespace TerminalApp
 
         Windows.UI.Xaml.UIElement GetRoot();
         IVector<IPaneContent> Panes { get; };
+        UInt32 NumberOfTabs();
 
         String Title { get; };
         Boolean FocusMode { get; };
@@ -105,6 +106,8 @@ namespace TerminalApp
         WindowProperties WindowProperties { get; };
         void WindowName(String name);
         void WindowId(UInt64 id);
+        void WindowHwnd(String hwnd);
+        void WindowSelector(String selector);
         Boolean IsQuakeWindow();
 
         // See IDialogPresenter and TerminalPage's DialogPresenter for more

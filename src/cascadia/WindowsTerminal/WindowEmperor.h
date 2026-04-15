@@ -59,6 +59,8 @@ private:
     void _createMessageWindow(const wchar_t* className);
     void _postQuitMessageIfNeeded() const;
     safe_void_coroutine _showMessageBox(winrt::hstring message, bool error);
+    std::string _buildWindowListJson() const;
+    void _writeWindowListJsonResponse(std::wstring_view responsePath) const;
     void _notificationAreaMenuRequested(WPARAM wParam);
     void _notificationAreaMenuClicked(WPARAM wParam, LPARAM lParam) const;
     void _hotkeyPressed(long hotkeyIndex);

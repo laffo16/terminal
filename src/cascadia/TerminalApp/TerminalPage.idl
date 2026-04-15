@@ -36,6 +36,8 @@ namespace TerminalApp
     {
         String WindowName { get; };
         UInt64 WindowId { get; };
+        String WindowHwnd { get; };
+        String WindowSelector { get; };
         String WindowNameForDisplay { get; };
         String WindowIdForDisplay { get; };
 

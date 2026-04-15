@@ -10,6 +10,8 @@ Stock Windows Terminal does not provide a public command-line surface for sendin
 - optionally press Enter after the text
 - delay Enter for TUIs like Codex that need a short settle gap
 - target a specific existing WT window deterministically
+- identify the current WT window directly from a patched shell
+- inventory running WT windows through a file-based JSON query
 
 ## What This Fork Adds
 
@@ -42,12 +44,58 @@ These selectors are intended for automation callers that already know the exact 
 
 Explicit selectors fail closed if they do not resolve. They do not silently create a new WT window.
 
+### Patched shell env vars
+
+Patched WT shells now expose:
+
+- `WT_PATCHED=1`
+- `WT_WINDOW_SELECTOR=hwnd:0x...`
+- `WT_WINDOW_HWND=0x...`
+- `WT_WINDOW_ID=<id>`
+- `WT_WINDOW_NAME=<name>` when the WT window has a name
+
+These vars are intended for shell-local tooling that needs to identify the current WT window without Win32 foreground probing.
+
+Notes:
+
+- `WT_SESSION` is still the stock WT session GUID.
+- window-scoped vars are launch-time snapshots for that shell session.
+- if a tab/window is later torn out, renamed, or moved, already-running child processes do not get refreshed env vars.
+
+### `wt list-windows`
+
+New query action:
+
+```powershell
+wt.exe list-windows --json --output <path>
+```
+
+This writes a JSON inventory of running WT windows to the provided path. The `--output` form is the reliable option for the packaged `wt.exe` alias.
+
+Current empty result:
+
+```json
+{"windows":[]}
+```
+
+Current per-window JSON fields:
+
+- `selector`
+- `hwnd`
+- `id`
+- `name`
+- `title`
+- `processId`
+- `isFocused`
+- `tabCount`
+
 ## Command Reference
 
 ### Primary command shape
 
 ```powershell
 wt.exe -w <target> send-input [--escape] [--enter] [--enter-delay-ms <ms>] [--activate] -- <text>
+wt.exe list-windows --json --output <path>
 ```
 
 ### Parameters
@@ -67,6 +115,9 @@ wt.exe -w <target> send-input [--escape] [--enter] [--enter-delay-ms <ms>] [--ac
   - existing-window `send-input` otherwise stays background by default
 - `--`
   - ends option parsing so command text such as `/quit` is treated as literal input
+- `list-windows --json --output <path>`
+  - writes the current WT window inventory as JSON
+  - intended for reliable external discovery from the packaged `wt.exe` alias
 
 ### Target selectors
 
@@ -90,7 +141,8 @@ wt.exe -w <target> send-input [--escape] [--enter] [--enter-delay-ms <ms>] [--ac
 
 - explicit typed selectors fail closed if the target does not resolve
 - explicit typed selectors are the preferred deterministic targeting surface for automation
-- helper-side discovery still happens outside WT
+- current-shell discovery can now use `WT_WINDOW_SELECTOR`
+- external discovery can now use `wt list-windows --json --output <path>`
 - Codex-oriented workflows commonly benefit from `--enter-delay-ms 200`
 
 ## Examples
@@ -117,6 +169,42 @@ wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 -- "/quit"
 
 ```powershell
 wt.exe -w name:codexdev send-input --enter "echo READY"
+```
+
+### Inspect current patched-shell variables
+
+```powershell
+Get-ChildItem Env:WT_* | Sort-Object Name
+$env:WT_WINDOW_SELECTOR
+```
+
+### Window inventory to JSON
+
+```powershell
+wt.exe list-windows --json --output C:\temp\wt-windows.json
+Get-Content C:\temp\wt-windows.json -Raw
+```
+
+### Discover, choose, then target
+
+```powershell
+wt.exe list-windows --json --output C:\temp\wt-windows.json
+$windows = (Get-Content C:\temp\wt-windows.json -Raw | ConvertFrom-Json).windows
+$focused = $windows | Where-Object isFocused | Select-Object -First 1
+wt.exe -w $focused.selector send-input --enter "echo READY"
+```
+
+### Current patched shell window selector
+
+```powershell
+$env:WT_WINDOW_SELECTOR
+```
+
+### Window inventory to JSON
+
+```powershell
+wt.exe list-windows --json --output C:\temp\wt-windows.json
+Get-Content C:\temp\wt-windows.json -Raw
 ```
 
 ## Intended Use
@@ -182,5 +270,6 @@ After registration, `wt.exe` on that machine will use the locally registered bui
 ## Notes For Maintainers Of This Fork
 
 - The preferred automation-grade target identity is `hwnd:0x...`.
-- Helper-side discovery still happens outside WT; this fork focuses on deterministic write targeting.
+- The preferred current-shell identity is `WT_WINDOW_SELECTOR`.
+- The preferred external inventory path is `wt list-windows --json --output <path>`.
 - Codex-oriented prompt flows commonly use `--enter-delay-ms 200` as a safe starting point.

@@ -7,6 +7,9 @@
 #include <CoreWindow.h>
 #include <ScopedResourceLoader.h>
 #include <WtExeUtils.h>
+#include <array>
+#include <fstream>
+#include <json/json.h>
 #include <til/hash.h>
 #include <wil/token_helpers.h>
 #include <winrt/TerminalApp.h>
@@ -28,8 +31,10 @@ using VirtualKeyModifiers = winrt::Windows::System::VirtualKeyModifiers;
 
 #ifdef _WIN64
 static constexpr ULONG_PTR TERMINAL_HANDOFF_MAGIC = 0x4c414e494d524554; // 'TERMINAL'
+static constexpr ULONG_PTR TERMINAL_LIST_WINDOWS_QUERY_MAGIC = 0x5157494e444f5753; // 'QWINDOWS'
 #else
 static constexpr ULONG_PTR TERMINAL_HANDOFF_MAGIC = 0x4d524554; // 'TERM'
+static constexpr ULONG_PTR TERMINAL_LIST_WINDOWS_QUERY_MAGIC = 0x444f5753; // 'DOWS'
 #endif
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
@@ -181,6 +186,237 @@ struct Handoff
     wil::zwstring_view cwd;
     uint32_t show;
 };
+
+enum class ListWindowsQueryParseState : uint8_t
+{
+    NotQuery = 0,
+    Ok = 1,
+    Invalid = 2,
+};
+
+struct ListWindowsQuery
+{
+    ListWindowsQueryParseState State{ ListWindowsQueryParseState::NotQuery };
+    std::wstring OutputPath;
+};
+
+static ListWindowsQuery _tryParseListWindowsQuery(const std::vector<winrt::hstring>& args, std::wstring& error) noexcept
+{
+    ListWindowsQuery result{};
+    if (args.size() < 2 || !til::equals_insensitive_ascii(args[1], L"list-windows"))
+    {
+        return result;
+    }
+
+    auto jsonSeen = false;
+    auto outputSeen = false;
+
+    for (size_t index = 2; index < args.size(); ++index)
+    {
+        const auto& arg = args[index];
+        if (til::equals_insensitive_ascii(arg, L"--json"))
+        {
+            if (jsonSeen)
+            {
+                error = L"wt list-windows received --json more than once.";
+                result.State = ListWindowsQueryParseState::Invalid;
+                return result;
+            }
+
+            jsonSeen = true;
+            continue;
+        }
+
+        if (til::equals_insensitive_ascii(arg, L"--output"))
+        {
+            if (outputSeen)
+            {
+                error = L"wt list-windows received --output more than once.";
+                result.State = ListWindowsQueryParseState::Invalid;
+                return result;
+            }
+
+            if (++index >= args.size())
+            {
+                error = L"wt list-windows requires a path after --output.";
+                result.State = ListWindowsQueryParseState::Invalid;
+                return result;
+            }
+
+            result.OutputPath.assign(args[index]);
+            outputSeen = true;
+            continue;
+        }
+
+        error = L"wt list-windows only supports optional --json and --output <path> flags.";
+        result.State = ListWindowsQueryParseState::Invalid;
+        return result;
+    }
+
+    result.State = ListWindowsQueryParseState::Ok;
+    return result;
+}
+
+static void _writeTextToStdHandle(const DWORD handleId, const std::string& text)
+{
+    if (const auto handle = GetStdHandle(handleId); handle && handle != INVALID_HANDLE_VALUE)
+    {
+        DWORD written = 0;
+        WriteFile(handle, text.data(), gsl::narrow_cast<DWORD>(text.size()), &written, nullptr);
+    }
+}
+
+static void _writeUtf8TextToFile(std::wstring_view path, const std::string& text)
+{
+    std::ofstream stream{ std::filesystem::path{ path }, std::ios::binary | std::ios::trunc };
+    if (!stream)
+    {
+        throw std::runtime_error("Unable to open list-windows output path.");
+    }
+
+    stream.write(text.data(), gsl::narrow_cast<std::streamsize>(text.size()));
+    if (!stream)
+    {
+        throw std::runtime_error("Unable to write list-windows output.");
+    }
+}
+
+static std::wstring _createTempResponsePath()
+{
+    wchar_t tempPath[MAX_PATH];
+    THROW_LAST_ERROR_IF(GetTempPathW(ARRAYSIZE(tempPath), tempPath) == 0);
+
+    wchar_t tempFile[MAX_PATH];
+    THROW_LAST_ERROR_IF(GetTempFileNameW(tempPath, L"wtq", 0, tempFile) == 0);
+    std::error_code ec;
+    std::filesystem::remove(tempFile, ec);
+    return tempFile;
+}
+
+static std::optional<std::string> _queryListWindowsFromExistingInstance(const wchar_t* className, const wchar_t* secondaryClassName = nullptr)
+{
+    for (DWORD sleep = 50; sleep < 10000; sleep += sleep / 2)
+    {
+        const std::array<const wchar_t*, 2> classNames{ className, secondaryClassName };
+        for (const auto candidateClassName : classNames)
+        {
+            if (!candidateClassName)
+            {
+                continue;
+            }
+
+            if (const auto hwnd = FindWindowW(candidateClassName, nullptr))
+            {
+                const auto responsePath = _createTempResponsePath();
+                std::vector<uint8_t> payload;
+                serializeString(payload, responsePath);
+
+                const COPYDATASTRUCT cds{
+                    .dwData = TERMINAL_LIST_WINDOWS_QUERY_MAGIC,
+                    .cbData = gsl::narrow<DWORD>(payload.size()),
+                    .lpData = payload.data(),
+                };
+
+                if (!SendMessageTimeoutW(hwnd, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&cds), SMTO_ABORTIFHUNG | SMTO_ERRORONEXIT, 5000, nullptr))
+                {
+                    THROW_LAST_ERROR();
+                }
+
+                std::ifstream stream{ responsePath, std::ios::binary };
+                if (!stream)
+                {
+                    throw std::runtime_error("Windows Terminal did not produce a list-windows response.");
+                }
+
+                const std::string response{ std::istreambuf_iterator<char>{ stream }, std::istreambuf_iterator<char>{} };
+                std::error_code ec;
+                std::filesystem::remove(responsePath, ec);
+                return response;
+            }
+        }
+
+        wil::unique_mutex mutex{ OpenMutexW(SYNCHRONIZE, FALSE, className) };
+        if (!mutex && GetLastError() == ERROR_FILE_NOT_FOUND)
+        {
+            return std::nullopt;
+        }
+
+        Sleep(sleep);
+    }
+
+    return std::nullopt;
+}
+
+std::string WindowEmperor::_buildWindowListJson() const
+{
+    _assertIsMainThread();
+
+    Json::Value root{ Json::objectValue };
+    Json::Value windows{ Json::arrayValue };
+    const auto focusedWindow = GetForegroundWindow();
+
+    for (const auto& host : _windows)
+    {
+        if (!host)
+        {
+            continue;
+        }
+
+        const auto* hostWindow = host->GetWindow();
+        if (!hostWindow)
+        {
+            continue;
+        }
+
+        const auto hwnd = hostWindow->GetHandle();
+        if (!hwnd)
+        {
+            continue;
+        }
+
+        DWORD processId = 0;
+        GetWindowThreadProcessId(hwnd, &processId);
+
+        const auto hwndString = til::hstring_format(FMT_COMPILE(L"0x{:X}"), reinterpret_cast<uintptr_t>(hwnd));
+        const auto& logic = host->Logic();
+        const auto properties = logic.WindowProperties();
+        const auto selector = properties.WindowSelector().empty() ? til::hstring_format(FMT_COMPILE(L"hwnd:{}"), std::wstring_view{ hwndString }) :
+                                                                    properties.WindowSelector();
+
+        Json::Value window{ Json::objectValue };
+        window["selector"] = winrt::to_string(selector);
+        window["hwnd"] = winrt::to_string(hwndString);
+        window["id"] = Json::Value::UInt64(properties.WindowId());
+        window["name"] = winrt::to_string(properties.WindowName());
+        window["title"] = winrt::to_string(logic.Title());
+        window["processId"] = Json::Value::UInt(processId);
+        window["isFocused"] = hwnd == focusedWindow;
+        window["tabCount"] = Json::Value::UInt(logic.NumberOfTabs());
+        windows.append(std::move(window));
+    }
+
+    root["windows"] = std::move(windows);
+
+    Json::StreamWriterBuilder writer;
+    writer["indentation"] = "";
+    return Json::writeString(writer, root);
+}
+
+void WindowEmperor::_writeWindowListJsonResponse(std::wstring_view responsePath) const
+{
+    std::ofstream stream{ std::filesystem::path{ responsePath }, std::ios::binary | std::ios::trunc };
+    if (!stream)
+    {
+        throw std::runtime_error("Unable to open list-windows response path.");
+    }
+
+    const auto json = _buildWindowListJson();
+    stream.write(json.data(), gsl::narrow_cast<std::streamsize>(json.size()));
+    if (!stream)
+    {
+        throw std::runtime_error("Unable to write list-windows response.");
+    }
+}
 
 // Serializes all relevant parameters to a byte blob for a WM_COPYDATA message.
 // This allows us to hand off an invocation to an existing instance of the Terminal.
@@ -395,6 +631,15 @@ AppHost* WindowEmperor::_mostRecentWindow() const noexcept
 
 void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
 {
+    const auto args = commandlineToArgArray(GetCommandLineW());
+    std::wstring listWindowsQueryError;
+    const auto listWindowsQuery = _tryParseListWindowsQuery(args, listWindowsQueryError);
+    if (listWindowsQuery.State == ListWindowsQueryParseState::Invalid)
+    {
+        _writeTextToStdHandle(STD_ERROR_HANDLE, til::u16u8(listWindowsQueryError + L"\n"));
+        ExitProcess(1);
+    }
+
     // When running without package identity, set an explicit AppUserModelID so
     // that toast notifications (and other shell features like taskbar grouping)
     // work correctly. We include...
@@ -402,27 +647,26 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
     // - a hash of the user SID
     // This prevents crosstalk between different portable/unpackaged installations.
     // The same isolation strategy is used for the single-instance mutex below.
-    std::wstring unpackagedAumid;
-
     std::wstring windowClassName;
     windowClassName.reserve(64); // "Windows Terminal Preview Admin 0123456789012345 0123456789012345"
 #if defined(WT_BRANDING_RELEASE)
     windowClassName.append(L"Windows Terminal");
-    unpackagedAumid = L"Microsoft.WindowsTerminal";
+    std::wstring unpackagedAumid = L"Microsoft.WindowsTerminal";
 #elif defined(WT_BRANDING_PREVIEW)
     windowClassName.append(L"Windows Terminal Preview");
-    unpackagedAumid = L"Microsoft.WindowsTerminalPreview";
+    std::wstring unpackagedAumid = L"Microsoft.WindowsTerminalPreview";
 #elif defined(WT_BRANDING_CANARY)
     windowClassName.append(L"Windows Terminal Canary");
-    unpackagedAumid = L"Microsoft.WindowsTerminalCanary";
+    std::wstring unpackagedAumid = L"Microsoft.WindowsTerminalCanary";
 #else
     windowClassName.append(L"Windows Terminal Dev");
-    unpackagedAumid = L"WindowsTerminalDev";
+    std::wstring unpackagedAumid = L"WindowsTerminalDev";
 #endif
     if (Utils::IsRunningElevated())
     {
         windowClassName.append(L" Admin");
     }
+    auto packagedWindowClassName = windowClassName;
     if (!IsPackaged())
     {
         const auto path = wil::QueryFullProcessImageNameW<std::wstring>();
@@ -442,8 +686,10 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
         const auto sidLength{ GetLengthSid(userTokenInfo->User.Sid) };
         const auto hash{ til::hash(userTokenInfo->User.Sid, sidLength) };
 #ifdef _WIN64
+        fmt::format_to(std::back_inserter(packagedWindowClassName), FMT_COMPILE(L" {:016x}"), hash);
         fmt::format_to(std::back_inserter(windowClassName), FMT_COMPILE(L" {:016x}"), hash);
 #else
+        fmt::format_to(std::back_inserter(packagedWindowClassName), FMT_COMPILE(L" {:08x}"), hash);
         fmt::format_to(std::back_inserter(windowClassName), FMT_COMPILE(L" {:08x}"), hash);
 #endif
         if (!IsPackaged())
@@ -454,6 +700,42 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
             fmt::format_to(std::back_inserter(unpackagedAumid), FMT_COMPILE(L".{:08x}"), hash);
 #endif
             LOG_IF_FAILED(SetCurrentProcessExplicitAppUserModelID(unpackagedAumid.c_str()));
+        }
+    }
+
+    if (listWindowsQuery.State == ListWindowsQueryParseState::Ok)
+    {
+        try
+        {
+            const auto alternateClassName = !IsPackaged() && packagedWindowClassName != windowClassName ? packagedWindowClassName.c_str() : nullptr;
+            if (const auto response = _queryListWindowsFromExistingInstance(windowClassName.c_str(), alternateClassName))
+            {
+                if (!listWindowsQuery.OutputPath.empty())
+                {
+                    _writeUtf8TextToFile(listWindowsQuery.OutputPath, *response + "\n");
+                }
+                else
+                {
+                    _writeTextToStdHandle(STD_OUTPUT_HANDLE, *response + "\n");
+                }
+                ExitProcess(0);
+            }
+
+            const auto emptyResponse = std::string{ R"({"windows":[]})" } + "\n";
+            if (!listWindowsQuery.OutputPath.empty())
+            {
+                _writeUtf8TextToFile(listWindowsQuery.OutputPath, emptyResponse);
+            }
+            else
+            {
+                _writeTextToStdHandle(STD_OUTPUT_HANDLE, emptyResponse);
+            }
+            ExitProcess(0);
+        }
+        catch (...)
+        {
+            _writeTextToStdHandle(STD_ERROR_HANDLE, std::string{ "wt list-windows failed.\n" });
+            ExitProcess(1);
         }
     }
 
@@ -509,8 +791,6 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
                 startIdx += 1;
             }
         }
-
-        const auto args = commandlineToArgArray(GetCommandLineW());
 
         if (args.size() == 2 && args[1] == L"-Embedding")
         {
@@ -1148,6 +1428,12 @@ LRESULT WindowEmperor::_messageHandler(HWND window, UINT const message, WPARAM c
                 const auto handoff = deserializeHandoffPayload(static_cast<const uint8_t*>(cds->lpData), static_cast<const uint8_t*>(cds->lpData) + cds->cbData);
                 const auto argv = commandlineToArgArray(handoff.args.c_str());
                 _dispatchCommandlineCommon(argv, handoff.cwd, handoff.env, handoff.show);
+            }
+            else if (cds->dwData == TERMINAL_LIST_WINDOWS_QUERY_MAGIC)
+            {
+                wil::zwstring_view responsePath;
+                std::ignore = deserializeString(static_cast<const uint8_t*>(cds->lpData), static_cast<const uint8_t*>(cds->lpData) + cds->cbData, responsePath);
+                _writeWindowListJsonResponse(responsePath);
             }
             return 0;
         case WM_HOTKEY:

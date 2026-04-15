@@ -841,6 +841,16 @@ namespace winrt::TerminalApp::implementation
         return winrt::single_threaded_vector(_root->Panes());
     }
 
+    uint32_t TerminalWindow::NumberOfTabs()
+    {
+        if (_root)
+        {
+            return _root->NumberOfTabs();
+        }
+
+        return 0;
+    }
+
     // Method Description:
     // - Gets the title of the currently focused terminal control. If there
     //   isn't a control selected for any reason, returns "Terminal"
@@ -1228,6 +1238,16 @@ namespace winrt::TerminalApp::implementation
         _WindowProperties->WindowId(id);
     }
 
+    void TerminalWindow::WindowHwnd(const winrt::hstring& value)
+    {
+        _WindowProperties->WindowHwnd(value);
+    }
+
+    void TerminalWindow::WindowSelector(const winrt::hstring& value)
+    {
+        _WindowProperties->WindowSelector(value);
+    }
+
     // Method Description:
     // - Deserialize this string of content into a list of actions to perform.
     //   If replaceFirstWithNewTab is true and the first serialized action is a
@@ -1395,6 +1415,26 @@ namespace winrt::TerminalApp::implementation
     void WindowProperties::WindowId(const uint64_t& value)
     {
         _WindowId = value;
+    }
+
+    winrt::hstring WindowProperties::WindowHwnd() const noexcept
+    {
+        return _WindowHwnd;
+    }
+
+    void WindowProperties::WindowHwnd(const winrt::hstring& value)
+    {
+        _WindowHwnd = value;
+    }
+
+    winrt::hstring WindowProperties::WindowSelector() const noexcept
+    {
+        return _WindowSelector;
+    }
+
+    void WindowProperties::WindowSelector(const winrt::hstring& value)
+    {
+        _WindowSelector = value;
     }
 
     // Method Description:

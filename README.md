@@ -11,6 +11,7 @@
 > - what this fork changes
 > - why the fork exists
 > - current command examples
+> - patched shell env vars and window inventory helpers
 > - local build/install steps
 > - upstream status and security-model notes
 
@@ -20,6 +21,7 @@ This fork adds:
 
 ```powershell
 wt.exe -w <target> send-input [--escape] [--enter] [--enter-delay-ms <ms>] [--activate] -- <text>
+wt.exe list-windows --json --output <path>
 ```
 
 Supported explicit existing-window selectors:
@@ -42,6 +44,17 @@ Parameter summary:
   - opt back into foreground activation for the target window
 - `--`
   - stop option parsing so slash-leading input like `/quit` is treated as text
+- `list-windows --json --output <path>`
+  - write a JSON inventory of running WT windows to a file
+  - intended for reliable external discovery from the packaged `wt.exe` alias
+
+Patched shell env vars:
+
+- `WT_PATCHED=1`
+- `WT_WINDOW_SELECTOR=hwnd:0x...`
+- `WT_WINDOW_HWND=0x...`
+- `WT_WINDOW_ID=<id>`
+- `WT_WINDOW_NAME=<name>` when set
 
 Quick examples:
 
@@ -49,6 +62,7 @@ Quick examples:
 wt.exe -w hwnd:0x123456 send-input --enter "echo READY"
 wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 "Please reply exactly with TEST_OK."
 wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 -- "/quit"
+wt.exe list-windows --json --output C:\temp\wt-windows.json
 ```
 
 ## Upstream README

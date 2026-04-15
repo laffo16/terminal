@@ -1510,7 +1510,34 @@ namespace winrt::TerminalApp::implementation
         else
         {
             auto settingsInternal{ winrt::get_self<Settings::TerminalSettings>(settings) };
-            const auto environment = settingsInternal->EnvironmentVariables();
+            const auto profileEnvironment = settingsInternal->EnvironmentVariables();
+            auto environmentOverrides = winrt::single_threaded_map<winrt::hstring, winrt::hstring>();
+            if (profileEnvironment)
+            {
+                for (const auto& [key, value] : profileEnvironment)
+                {
+                    environmentOverrides.Insert(key, value);
+                }
+            }
+
+            environmentOverrides.Insert(L"WT_PATCHED", L"1");
+
+            if (const auto selector = _WindowProperties.WindowSelector(); !selector.empty())
+            {
+                environmentOverrides.Insert(L"WT_WINDOW_SELECTOR", selector);
+            }
+
+            if (const auto hwnd = _WindowProperties.WindowHwnd(); !hwnd.empty())
+            {
+                environmentOverrides.Insert(L"WT_WINDOW_HWND", hwnd);
+            }
+
+            environmentOverrides.Insert(L"WT_WINDOW_ID", winrt::to_hstring(_WindowProperties.WindowId()));
+
+            if (const auto name = _WindowProperties.WindowName(); !name.empty())
+            {
+                environmentOverrides.Insert(L"WT_WINDOW_NAME", name);
+            }
 
             // Update the path to be relative to whatever our CWD is.
             //
@@ -1534,7 +1561,7 @@ namespace winrt::TerminalApp::implementation
                                                                             settings.StartingTitle(),
                                                                             settingsInternal->ReloadEnvironmentVariables(),
                                                                             _WindowProperties.VirtualEnvVars(),
-                                                                            environment,
+                                                                            environmentOverrides.GetView(),
                                                                             settings.InitialRows(),
                                                                             settings.InitialCols(),
                                                                             winrt::guid(),

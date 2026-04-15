@@ -78,6 +78,11 @@ AppHost::AppHost(WindowEmperor* manager, const winrt::TerminalApp::AppLogic& log
 
     _window->MakeWindow();
 
+    const auto hwnd = _window->GetHandle();
+    const auto hwndString = til::hstring_format(FMT_COMPILE(L"0x{:X}"), reinterpret_cast<uintptr_t>(hwnd));
+    _windowLogic.WindowHwnd(hwndString);
+    _windowLogic.WindowSelector(til::hstring_format(FMT_COMPILE(L"hwnd:{}"), std::wstring_view{ hwndString }));
+
     // Does window creation mean the window was activated (WM_ACTIVATE)? No.
     // But it simplifies `WindowEmperor::_mostRecentWindow()`, because now the creation of a
     // new window marks it as the most recent one immediately, even before it becomes active.
