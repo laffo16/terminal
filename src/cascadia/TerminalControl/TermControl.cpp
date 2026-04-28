@@ -586,7 +586,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             const auto data = buffer.data();
             const auto stride = scrollBarWidthInPx * sizeof(til::color);
 
-            // The bitmap has the size of the entire scrollbar, but we want the marks to only show in the range the "thumb"
+            // The bitmap has the size of the entire scrollbar, but we want the marks to only show in the range that the "thumb"
             // (the scroll indicator) can move. That's why we need to add an offset to the start of the drawable bitmap area
             // (to offset the decrease button) and subtract twice that (to offset the increase button as well).
             //
@@ -2913,8 +2913,6 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
         else
         {
-            // Do we ever get here (= uninitialized terminal)? If so: How?
-            assert(false);
             return { 10, 10 };
         }
     }
