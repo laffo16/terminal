@@ -24,6 +24,8 @@ wt.exe -w <target> send-input [--escape] [--enter] [--enter-delay-ms <ms>] [--ac
 wt.exe list-windows
 ```
 
+On this machine, the currently registered local package is reached through `wtd.exe`. The `wt.exe` command shape above is kept as the generic surface description.
+
 Supported explicit existing-window selectors:
 
 - `-w hwnd:0x<HWND>`
@@ -37,9 +39,11 @@ Parameter summary:
 - `--escape`
   - interpret the input text as escaped sequences such as `\u0015`
 - `--enter`
-  - press Enter after the text
+  - submit the text with Enter
+  - for normal text payloads, WT applies the default safe submit delay before Enter
 - `--enter-delay-ms <ms>`
-  - wait before pressing Enter; useful for TUIs like Codex
+  - override the default submit delay used by `--enter`
+  - only needed when a caller wants custom timing
 - `--activate`
   - opt back into foreground activation for the target window
 - `--`
@@ -59,8 +63,9 @@ Quick examples:
 
 ```powershell
 wt.exe -w hwnd:0x123456 send-input --enter "echo READY"
-wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 "Please reply exactly with TEST_OK."
-wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 -- "/quit"
+wt.exe -w hwnd:0x123456 send-input --enter "Please reply exactly with TEST_OK."
+wt.exe -w hwnd:0x123456 send-input --enter -- "/quit"
+wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 500 "Use a custom submit delay only when you mean it."
 wt.exe list-windows
 ```
 

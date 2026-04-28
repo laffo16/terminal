@@ -256,8 +256,10 @@ namespace Microsoft.Terminal.Settings.Model
     {
         SendInputArgs(String input);
         SendInputArgs(String input, UInt32 enterDelayMs);
+        SendInputArgs(String input, Boolean submitEnter, UInt32 enterDelayMs);
 
         String Input { get; };
+        Boolean SubmitEnter { get; };
         UInt32 EnterDelayMs { get; };
     };
 

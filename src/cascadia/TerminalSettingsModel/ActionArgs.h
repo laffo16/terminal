@@ -139,6 +139,7 @@ protected:                                                                  \
 ////////////////////////////////////////////////////////////////////////////////
 #define SEND_INPUT_ARGS(X) \
     X(winrt::hstring, Input, "input", args->Input().empty(), ArgTypeHint::None, L"") \
+    X(bool, SubmitEnter, "submitEnter", false, ArgTypeHint::None, false) \
     X(uint32_t, EnterDelayMs, "enterDelayMs", false, ArgTypeHint::None, 0u)
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -898,7 +899,13 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         PARTIAL_ACTION_ARG_BODY(SendInputArgs, SEND_INPUT_ARGS);
 
         SendInputArgs(const winrt::hstring& input) :
-            SendInputArgs(input, 0u) {}
+            SendInputArgs(input, false, 0u) {}
+
+        SendInputArgs(const winrt::hstring& input, const bool submitEnter) :
+            SendInputArgs(input, submitEnter, 0u) {}
+
+        SendInputArgs(const winrt::hstring& input, const uint32_t enterDelayMs) :
+            SendInputArgs(input, true, enterDelayMs) {}
 
     public:
         hstring GenerateName() const
@@ -912,6 +919,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             if (otherAsUs)
             {
                 return otherAsUs->_Input == _Input &&
+                       otherAsUs->_SubmitEnter == _SubmitEnter &&
                        otherAsUs->_EnterDelayMs == _EnterDelayMs;
             }
             return false;
@@ -920,6 +928,10 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         {
             auto args = winrt::make_self<SendInputArgs>();
             SEND_INPUT_ARGS(FROM_JSON_ARGS);
+            if (args->EnterDelayMs() > 0 && !args->_SubmitEnter.has_value())
+            {
+                args->SubmitEnter(true);
+            }
             return { *args, {} };
         }
         static Json::Value ToJson(const IActionArgs& val)
@@ -931,6 +943,10 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             Json::Value json{ Json::ValueType::objectValue };
             const auto args{ get_self<SendInputArgs>(val) };
             JsonUtils::SetValueForKey(json, "input", args->_Input);
+            if (args->SubmitEnter() && args->EnterDelayMs() == 0)
+            {
+                JsonUtils::SetValueForKey(json, "submitEnter", args->_SubmitEnter);
+            }
             if (args->EnterDelayMs() > 0)
             {
                 JsonUtils::SetValueForKey(json, "enterDelayMs", args->_EnterDelayMs);
@@ -947,7 +963,14 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         {
             til::hasher h;
             h.write(Input());
-            h.write(EnterDelayMs());
+            if (SubmitEnter() || EnterDelayMs() > 0)
+            {
+                h.write(true);
+            }
+            if (EnterDelayMs() > 0)
+            {
+                h.write(EnterDelayMs());
+            }
             return h.finalize();
         }
     };

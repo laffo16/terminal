@@ -8,7 +8,7 @@ Stock Windows Terminal does not provide a public command-line surface for sendin
 
 - send text into an existing Windows Terminal window
 - optionally press Enter after the text
-- delay Enter for TUIs like Codex that need a short settle gap
+- use a safe default submit gap for normal text when Enter is requested
 - target a specific existing WT window deterministically
 - identify the current WT window directly from a patched shell
 - inventory running WT windows through a file-based JSON query
@@ -107,9 +107,10 @@ wt.exe list-windows
   - useful for control characters such as `\u0015`
 - `--enter`
   - sends Enter after the text
+  - for normal text payloads, this uses WT's default safe submit delay
 - `--enter-delay-ms <ms>`
-  - delays Enter submission
-  - primarily intended for TUIs like Codex that need a short gap between text and submit
+  - overrides WT's default submit delay
+  - only needed when a caller wants custom timing
 - `--activate`
   - opts back into normal foreground activation behavior
   - existing-window `send-input` otherwise stays background by default
@@ -142,7 +143,8 @@ wt.exe list-windows
 - explicit typed selectors are the preferred deterministic targeting surface for automation
 - current-shell discovery can now use `WT_WINDOW_SELECTOR`
 - external discovery can now use `wt list-windows`
-- Codex-oriented workflows commonly benefit from `--enter-delay-ms 200`
+- For Codex and normal prompt submission, plain `--enter` is the preferred path.
+- `--enter-delay-ms <ms>` is an advanced override for callers that want custom timing.
 
 ## Examples
 
@@ -155,13 +157,13 @@ wt.exe -w hwnd:0x123456 send-input --enter "echo READY"
 ### Codex prompt submission
 
 ```powershell
-wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 "Please reply exactly with TEST_OK."
+wt.exe -w hwnd:0x123456 send-input --enter "Please reply exactly with TEST_OK."
 ```
 
 ### Clean Codex quit
 
 ```powershell
-wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 200 -- "/quit"
+wt.exe -w hwnd:0x123456 send-input --enter -- "/quit"
 ```
 
 ### Window-name targeting
@@ -261,11 +263,12 @@ Example from this fork's current working flow:
 powershell.exe -NoProfile -Command "Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Register '<repo-root>\src\cascadia\CascadiaPackage\bin\x64\Release\AppxManifest.xml>'"
 ```
 
-After registration, `wt.exe` on that machine will use the locally registered build.
+On this machine, the currently registered local build is reached through `wtd.exe`.
 
 ## Notes For Maintainers Of This Fork
 
 - The preferred automation-grade target identity is `hwnd:0x...`.
 - The preferred current-shell identity is `WT_WINDOW_SELECTOR`.
 - The preferred external inventory path is `wt list-windows`.
-- Codex-oriented prompt flows commonly use `--enter-delay-ms 200` as a safe starting point.
+- Codex-oriented prompt flows should normally use plain `--enter`.
+- Keep `--enter-delay-ms <ms>` for custom timing, diagnostics, or non-default app behavior.

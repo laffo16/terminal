@@ -925,6 +925,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         RawWriteString(wstr);
     }
+
+    void TermControl::PasteText(const winrt::hstring& text)
+    {
+        PreviewInput(hstring{});
+        _pasteTextWithBroadcast(text);
+    }
+
     void TermControl::ClearBuffer(Control::ClearBufferType clearType)
     {
         _core.ClearBuffer(clearType);

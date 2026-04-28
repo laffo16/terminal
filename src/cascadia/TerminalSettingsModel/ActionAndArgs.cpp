@@ -120,6 +120,10 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
             {
                 til::hasher h;
                 h.write(sendInputArgs.Input());
+                if (sendInputArgs.SubmitEnter() || sendInputArgs.EnterDelayMs() > 0)
+                {
+                    h.write(true);
+                }
                 if (sendInputArgs.EnterDelayMs() > 0)
                 {
                     h.write(sendInputArgs.EnterDelayMs());

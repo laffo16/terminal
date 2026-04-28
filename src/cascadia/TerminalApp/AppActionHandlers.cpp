@@ -33,6 +33,34 @@ namespace winrt::TerminalApp::implementation
 {
     namespace
     {
+        constexpr uint32_t PasteSubmitEnterDelayMs = 200;
+
+        bool _shouldPasteSendInputPayload(const winrt::hstring& input) noexcept
+        {
+            for (const auto ch : input)
+            {
+                switch (ch)
+                {
+                case L'\t':
+                case L'\r':
+                case L'\n':
+                    continue;
+                default:
+                    if ((ch >= 0 && ch < 0x20) || ch == 0x7f)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        void _sendInputSubmitEnter(const TermControl& termControl)
+        {
+            termControl.SendInput(L"\r");
+        }
+
         safe_void_coroutine _SendInputEnterAfterDelay(winrt::weak_ref<TermControl> weakControl, const CoreDispatcher dispatcher, const uint32_t enterDelayMs)
         {
             co_await winrt::resume_after(std::chrono::milliseconds{ enterDelayMs });
@@ -42,7 +70,7 @@ namespace winrt::TerminalApp::implementation
             {
                 // Delayed Enter is intentionally a second injection so clients can
                 // observe the text payload before submit.
-                termControl.SendInput(L"\r");
+                _sendInputSubmitEnter(termControl);
             }
         }
     }
@@ -201,10 +229,34 @@ namespace winrt::TerminalApp::implementation
         {
             if (const auto termControl{ _senderOrActiveControl(sender) })
             {
-                termControl.SendInput(realArgs.Input());
-                if (realArgs.EnterDelayMs() > 0)
+                const auto& input = realArgs.Input();
+                const auto shouldPastePayload = _shouldPasteSendInputPayload(input);
+                if (shouldPastePayload)
                 {
-                    _SendInputEnterAfterDelay(winrt::weak_ref<TermControl>{ termControl }, termControl.Dispatcher(), realArgs.EnterDelayMs());
+                    termControl.PasteText(input);
+                }
+                else
+                {
+                    termControl.SendInput(input);
+                }
+
+                if (realArgs.SubmitEnter())
+                {
+                    if (realArgs.EnterDelayMs() > 0)
+                    {
+                        _SendInputEnterAfterDelay(winrt::weak_ref<TermControl>{ termControl }, termControl.Dispatcher(), realArgs.EnterDelayMs());
+                    }
+                    else if (shouldPastePayload)
+                    {
+                        // Some interactive apps treat Enter that arrives in the same burst as pasted text
+                        // as part of the paste instead of a real submit. Give paste-style payloads a short
+                        // built-in gap before the submit key unless the caller requested an explicit delay.
+                        _SendInputEnterAfterDelay(winrt::weak_ref<TermControl>{ termControl }, termControl.Dispatcher(), PasteSubmitEnterDelayMs);
+                    }
+                    else
+                    {
+                        _sendInputSubmitEnter(termControl);
+                    }
                 }
                 args.Handled(true);
             }

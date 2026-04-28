@@ -1523,7 +1523,8 @@ namespace TerminalAppLocalTests
 
             const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
             VERIFY_IS_NOT_NULL(myArgs);
-            VERIFY_ARE_EQUAL(L"echo ready\r", myArgs.Input());
+            VERIFY_ARE_EQUAL(L"echo ready", myArgs.Input());
+            VERIFY_IS_TRUE(myArgs.SubmitEnter());
             VERIFY_ARE_EQUAL(0u, myArgs.EnterDelayMs());
         }
         {
@@ -1550,6 +1551,7 @@ namespace TerminalAppLocalTests
             const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
             VERIFY_IS_NOT_NULL(myArgs);
             VERIFY_ARE_EQUAL(L"echo ready", myArgs.Input());
+            VERIFY_IS_TRUE(myArgs.SubmitEnter());
             VERIFY_ARE_EQUAL(75u, myArgs.EnterDelayMs());
         }
         {
@@ -1567,7 +1569,8 @@ namespace TerminalAppLocalTests
 
             const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
             VERIFY_IS_NOT_NULL(myArgs);
-            VERIFY_ARE_EQUAL(L"echo ready\r", myArgs.Input());
+            VERIFY_ARE_EQUAL(L"echo ready", myArgs.Input());
+            VERIFY_IS_TRUE(myArgs.SubmitEnter());
             VERIFY_ARE_EQUAL(0u, myArgs.EnterDelayMs());
         }
         {
@@ -1586,6 +1589,7 @@ namespace TerminalAppLocalTests
             const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
             VERIFY_IS_NOT_NULL(myArgs);
             VERIFY_ARE_EQUAL(winrt::hstring{ L"\u001b[A" }, myArgs.Input());
+            VERIFY_IS_FALSE(myArgs.SubmitEnter());
         }
         {
             AppCommandlineArgs appArgs{};
@@ -1603,6 +1607,7 @@ namespace TerminalAppLocalTests
             const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
             VERIFY_IS_NOT_NULL(myArgs);
             VERIFY_ARE_EQUAL(winrt::hstring{ L"\u001b[A" }, myArgs.Input());
+            VERIFY_IS_TRUE(myArgs.SubmitEnter());
             VERIFY_ARE_EQUAL(75u, myArgs.EnterDelayMs());
         }
         {

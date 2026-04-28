@@ -52,7 +52,9 @@ namespace SettingsModelUnitTests
 
         TEST_METHOD(RoundtripGenerateActionID);
         TEST_METHOD(SendInputZeroDelayPreservesGeneratedActionID);
+        TEST_METHOD(SendInputImmediateEnterGetsDistinctGeneratedActionID);
         TEST_METHOD(SendInputDelayedEnterGetsDistinctGeneratedActionID);
+        TEST_METHOD(RoundtripSendInputImmediateEnter);
         TEST_METHOD(RoundtripSendInputEnterDelay);
         TEST_METHOD(NoGeneratedIDsForIterableAndNestedCommands);
         TEST_METHOD(GeneratedActionIDsEqualForIdenticalCommands);
@@ -1053,6 +1055,54 @@ namespace SettingsModelUnitTests
         VERIFY_ARE_EQUAL(legacySendInputCmd.ID(), explicitZeroDelaySendInputCmd.ID());
     }
 
+    void SerializationTests::SendInputImmediateEnterGetsDistinctGeneratedActionID()
+    {
+        static constexpr std::string_view legacySettingsJson{ R"(
+        {
+            "actions": [
+                {
+                    "name": "foo",
+                    "command": { "action": "sendInput", "input": "just some input" },
+                    "keys": "ctrl+shift+w"
+                }
+            ]
+        })" };
+
+        static constexpr std::string_view immediateEnterSettingsJson{ R"(
+        {
+            "actions": [
+                {
+                    "name": "foo",
+                    "command": { "action": "sendInput", "input": "just some input", "submitEnter": true },
+                    "keys": "ctrl+shift+w"
+                }
+            ]
+        })" };
+
+        implementation::SettingsLoader legacyLoader{ legacySettingsJson, implementation::LoadStringResource(IDR_DEFAULTS) };
+        legacyLoader.MergeInboxIntoUserSettings();
+        legacyLoader.FinalizeLayering();
+        legacyLoader.FixupUserSettings();
+        const auto legacySettings = winrt::make_self<implementation::CascadiaSettings>(std::move(legacyLoader));
+
+        implementation::SettingsLoader immediateEnterLoader{ immediateEnterSettingsJson, implementation::LoadStringResource(IDR_DEFAULTS) };
+        immediateEnterLoader.MergeInboxIntoUserSettings();
+        immediateEnterLoader.FinalizeLayering();
+        immediateEnterLoader.FixupUserSettings();
+        const auto immediateEnterSettings = winrt::make_self<implementation::CascadiaSettings>(std::move(immediateEnterLoader));
+
+        const auto legacySendInputCmd = legacySettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
+        const auto immediateEnterSendInputCmd = immediateEnterSettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
+
+        VERIFY_IS_NOT_NULL(legacySendInputCmd);
+        VERIFY_IS_NOT_NULL(immediateEnterSendInputCmd);
+        const auto immediateArgs = immediateEnterSendInputCmd.ActionAndArgs().Args().try_as<SendInputArgs>();
+        VERIFY_IS_NOT_NULL(immediateArgs);
+        VERIFY_ARE_NOT_EQUAL(legacySendInputCmd.ID(), immediateEnterSendInputCmd.ID());
+        VERIFY_IS_TRUE(immediateArgs.SubmitEnter());
+        VERIFY_ARE_EQUAL(0u, immediateArgs.EnterDelayMs());
+    }
+
     void SerializationTests::SendInputDelayedEnterGetsDistinctGeneratedActionID()
     {
         static constexpr std::string_view legacySettingsJson{ R"(
@@ -1097,7 +1147,45 @@ namespace SettingsModelUnitTests
         const auto delayedArgs = delayedEnterSendInputCmd.ActionAndArgs().Args().try_as<SendInputArgs>();
         VERIFY_IS_NOT_NULL(delayedArgs);
         VERIFY_ARE_NOT_EQUAL(legacySendInputCmd.ID(), delayedEnterSendInputCmd.ID());
+        VERIFY_IS_TRUE(delayedArgs.SubmitEnter());
         VERIFY_ARE_EQUAL(75u, delayedArgs.EnterDelayMs());
+    }
+
+    void SerializationTests::RoundtripSendInputImmediateEnter()
+    {
+        static constexpr std::string_view immediateEnterSettingsJson{ R"(
+        {
+            "actions": [
+                {
+                    "name": "foo",
+                    "command": { "action": "sendInput", "input": "just some input", "submitEnter": true },
+                    "keys": "ctrl+shift+w"
+                }
+            ]
+        })" };
+
+        implementation::SettingsLoader loader{ immediateEnterSettingsJson, implementation::LoadStringResource(IDR_DEFAULTS) };
+        loader.MergeInboxIntoUserSettings();
+        loader.FinalizeLayering();
+        loader.FixupUserSettings();
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(std::move(loader));
+
+        const auto oldResult{ settings->ToJson() };
+
+        implementation::SettingsLoader roundtripLoader{ toString(oldResult), implementation::LoadStringResource(IDR_DEFAULTS) };
+        roundtripLoader.MergeInboxIntoUserSettings();
+        roundtripLoader.FinalizeLayering();
+        roundtripLoader.FixupUserSettings();
+        const auto roundtripSettings = winrt::make_self<implementation::CascadiaSettings>(std::move(roundtripLoader));
+        const auto newResult{ roundtripSettings->ToJson() };
+        const auto sendInputCmd = roundtripSettings->ActionMap().GetActionByKeyChord(KeyChord{ true, false, true, false, 87, 0 });
+
+        VERIFY_IS_NOT_NULL(sendInputCmd);
+        const auto args = sendInputCmd.ActionAndArgs().Args().try_as<SendInputArgs>();
+        VERIFY_IS_NOT_NULL(args);
+        VERIFY_IS_TRUE(args.SubmitEnter());
+        VERIFY_ARE_EQUAL(0u, args.EnterDelayMs());
+        VERIFY_ARE_EQUAL(toString(newResult), toString(oldResult));
     }
 
     void SerializationTests::RoundtripSendInputEnterDelay()
@@ -1132,6 +1220,7 @@ namespace SettingsModelUnitTests
         VERIFY_IS_NOT_NULL(sendInputCmd);
         const auto delayedArgs = sendInputCmd.ActionAndArgs().Args().try_as<SendInputArgs>();
         VERIFY_IS_NOT_NULL(delayedArgs);
+        VERIFY_IS_TRUE(delayedArgs.SubmitEnter());
         VERIFY_ARE_EQUAL(75u, delayedArgs.EnterDelayMs());
         VERIFY_ARE_EQUAL(toString(newResult), toString(oldResult));
     }

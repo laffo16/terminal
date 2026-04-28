@@ -361,10 +361,10 @@
     <value>Bring the target window to the foreground before executing the commandline</value>
   </data>
   <data name="CmdSendInputEnterDesc" xml:space="preserve">
-    <value>Append a carriage return to the input</value>
+    <value>Send Enter after the input; normal text uses the default safe submit delay</value>
   </data>
   <data name="CmdSendInputEnterDelayDesc" xml:space="preserve">
-    <value>When used with --enter, delay the carriage return by the given number of milliseconds</value>
+    <value>When used with --enter, override the default submit delay in milliseconds</value>
   </data>
   <data name="CmdProfileArgDesc" xml:space="preserve">
     <value>Open with the given profile. Accepts either the name or GUID of a profile</value>

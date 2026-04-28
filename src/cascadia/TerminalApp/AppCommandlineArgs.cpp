@@ -636,19 +636,7 @@ void AppCommandlineArgs::_buildSendInputParser()
         auto input = _sendInputEscapes ? _decodeEscapedInput(rawInput) :
                                          winrt::to_hstring(rawInput);
 
-        if (_sendInputEnter && _sendInputEnterDelayMs == 0)
-        {
-            input = input + L"\r";
-        }
-
-        if (_sendInputEnterDelayMs > 0)
-        {
-            sendInputAction.Args(SendInputArgs{ input, _sendInputEnterDelayMs });
-        }
-        else
-        {
-            sendInputAction.Args(SendInputArgs{ input });
-        }
+        sendInputAction.Args(SendInputArgs{ input, _sendInputEnter, _sendInputEnterDelayMs });
         _startupActions.push_back(std::move(sendInputAction));
     });
 }
