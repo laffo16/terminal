@@ -263,7 +263,7 @@ Example from this fork's current working flow:
 powershell.exe -NoProfile -Command "Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Register '<repo-root>\src\cascadia\CascadiaPackage\bin\x64\Release\AppxManifest.xml>'"
 ```
 
-On this machine, the currently registered local build is reached through `wtd.exe`.
+The installed execution alias depends on package branding. Dev-branded packages typically expose `wtd.exe`; Preview/Release-branded packages typically expose `wt.exe`.
 
 ## Notes For Maintainers Of This Fork
 

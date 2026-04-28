@@ -24,7 +24,7 @@ wt.exe -w <target> send-input [--escape] [--enter] [--enter-delay-ms <ms>] [--ac
 wt.exe list-windows
 ```
 
-On this machine, the currently registered local package is reached through `wtd.exe`. The `wt.exe` command shape above is kept as the generic surface description.
+The installed execution alias depends on package branding. Dev-branded packages typically expose `wtd.exe`; Preview/Release-branded packages typically expose `wt.exe`. The command shape above uses `wt.exe` as the generic surface description.
 
 Supported explicit existing-window selectors:
 
