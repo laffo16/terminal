@@ -74,6 +74,27 @@ namespace
 
         return false;
     }
+
+    bool _isSendInputLiteralPayload(const Commandline& command) noexcept
+    {
+        auto sawSendInput = false;
+
+        for (const auto& arg : command.Args())
+        {
+            if (!sawSendInput)
+            {
+                sawSendInput = til::equals_insensitive_ascii(std::string_view{ arg }, std::string_view{ "send-input" });
+                continue;
+            }
+
+            if (arg == "--")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 
 AppCommandlineArgs::AppCommandlineArgs()
@@ -957,7 +978,7 @@ std::vector<Commandline> AppCommandlineArgs::BuildCommands(winrt::array_view<con
     //   command with the second bit.
     for (const auto& arg : args)
     {
-        _addCommandsForArg(commands, { arg });
+        _addCommandsForArg(commands, { arg }, _isSendInputLiteralPayload(commands.back()));
     }
 
     return commands;
@@ -991,7 +1012,7 @@ std::vector<Commandline> AppCommandlineArgs::BuildCommands(const std::vector<con
     //   command with the second bit.
     for (const auto& arg : args)
     {
-        _addCommandsForArg(commands, { arg });
+        _addCommandsForArg(commands, { arg }, _isSendInputLiteralPayload(commands.back()));
     }
 
     return commands;
@@ -1010,10 +1031,19 @@ std::vector<Commandline> AppCommandlineArgs::BuildCommands(const std::vector<con
 // - commands: a list of Commandline objects to modify and append to
 // - arg: a single argument that should be parsed into args to append to the
 //   current command, or create more Commandlines
+// - preserveDelimiters: if true, append the arg without treating semicolons as
+//   command separators. This is used for `send-input -- <payload>`, where
+//   semicolons belong to the payload instead of the WT command line.
 // Return Value:
 // <none>
-void AppCommandlineArgs::_addCommandsForArg(std::vector<Commandline>& commands, std::wstring_view arg)
+void AppCommandlineArgs::_addCommandsForArg(std::vector<Commandline>& commands, std::wstring_view arg, bool preserveDelimiters)
 {
+    if (preserveDelimiters)
+    {
+        commands.back().AddArg(std::wstring{ arg });
+        return;
+    }
+
     std::wstring remaining{ arg };
     std::wsmatch match;
     // Keep looking for matches until we've found no unescaped delimiters,

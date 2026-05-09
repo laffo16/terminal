@@ -145,6 +145,15 @@ wt.exe list-windows
 - external discovery can now use `wt list-windows`
 - For Codex and normal prompt submission, plain `--enter` is the preferred path.
 - `--enter-delay-ms <ms>` is an advanced override for callers that want custom timing.
+- Automation that targets Codex should not rely on terminal titles. Codex can
+  change titles or statusline text while a turn is running, waiting for
+  approval, compacting, or showing action-required state. Prefer the current
+  shell's `WT_WINDOW_SELECTOR` or a saved `hwnd:0x...` selector, and re-check
+  `wt list-windows` before delivery if the target may have moved.
+- `send-input` remains the local shell/handover path. Codex app-server or
+  remote-control APIs may eventually replace some prompt-delivery cases, but
+  they do not replace this fork's deterministic window targeting for shell
+  startup, `/quit`, resume, or fresh-session handover workflows.
 
 ## Examples
 
@@ -158,7 +167,17 @@ wt.exe -w hwnd:0x123456 send-input --enter "echo READY"
 
 ```powershell
 wt.exe -w hwnd:0x123456 send-input --enter "Please reply exactly with TEST_OK."
+wt.exe -w hwnd:0x123456 send-input --enter -- "First line; still payload`nSecond line"
 ```
+
+Use `--` before arbitrary prompt text, especially multiline text or text that
+contains semicolons. After `send-input --`, semicolons are payload characters,
+not WT command separators.
+
+For Codex automation, get the target from `WT_WINDOW_SELECTOR` or
+`wt.exe list-windows` first. Avoid matching on a visible title because action
+state, approval prompts, compaction, and dynamic status text can change it
+between discovery and delivery.
 
 ### Clean Codex quit
 
@@ -272,3 +291,9 @@ The installed execution alias depends on package branding. Dev-branded packages 
 - The preferred external inventory path is `wt list-windows`.
 - Codex-oriented prompt flows should normally use plain `--enter`.
 - Keep `--enter-delay-ms <ms>` for custom timing, diagnostics, or non-default app behavior.
+- Keep tracked examples generic. Do not add credentials, private paths,
+  machine/user names, or local-only Codex workflow details to this public fork.
+- Track Codex `remote-control` separately as an experimental alternative for
+  future managed prompt delivery. Do not remove patched WT shell/handover
+  coverage until remote-control proves parity for startup, attach, `/quit`,
+  resume, and interruption flows.

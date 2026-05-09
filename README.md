@@ -59,15 +59,25 @@ Patched shell env vars:
 - `WT_WINDOW_ID=<id>`
 - `WT_WINDOW_NAME=<name>` when set
 
+For Codex automation, prefer `WT_WINDOW_SELECTOR` or a saved `hwnd:0x...`
+selector from `list-windows`. Do not match on visible terminal titles; Codex can
+change title/status text while a turn is active, waiting for approval,
+compacting, or showing action-required state.
+
 Quick examples:
 
 ```powershell
 wt.exe -w hwnd:0x123456 send-input --enter "echo READY"
 wt.exe -w hwnd:0x123456 send-input --enter "Please reply exactly with TEST_OK."
 wt.exe -w hwnd:0x123456 send-input --enter -- "/quit"
+wt.exe -w hwnd:0x123456 send-input --enter -- "First line; still payload`nSecond line"
 wt.exe -w hwnd:0x123456 send-input --enter --enter-delay-ms 500 "Use a custom submit delay only when you mean it."
 wt.exe list-windows
 ```
+
+Use `--` before arbitrary prompt text, especially multiline text or text that
+contains semicolons. After `send-input --`, semicolons are payload characters,
+not WT command separators.
 
 ## Upstream README
 

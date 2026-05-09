@@ -1886,6 +1886,47 @@ namespace TerminalAppLocalTests
             VERIFY_IS_NOT_NULL(myArgs);
             VERIFY_ARE_EQUAL(L"/quit", myArgs.Input());
         }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"-w", L"hwnd:0x1234", L"send-input", L"--enter", L"--", L"first line;\nsecond line; approval-required" };
+            _buildCommandlinesHelper(appArgs, 1u, rawCommands);
+
+            VERIFY_ARE_EQUAL(1u, appArgs._startupActions.size());
+            VERIFY_IS_FALSE(appArgs.ShouldActivateWindow());
+            VERIFY_ARE_EQUAL(std::string{ "hwnd:0x1234" }, std::string{ appArgs.GetTargetWindow() });
+
+            const auto actionAndArgs = appArgs._startupActions.at(0);
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, actionAndArgs.Action());
+
+            const auto myArgs = actionAndArgs.Args().try_as<SendInputArgs>();
+            VERIFY_IS_NOT_NULL(myArgs);
+            VERIFY_ARE_EQUAL(L"first line;\nsecond line; approval-required", myArgs.Input());
+            VERIFY_IS_TRUE(myArgs.SubmitEnter());
+        }
+        {
+            AppCommandlineArgs appArgs{};
+            std::vector<const wchar_t*> rawCommands{ L"wt.exe", L"-w", L"hwnd:0x1234", L"new-tab", L"--title", L"launching-codex", L";", L"send-input", L"--enter", L"--", L"approve action; keep target by hwnd" };
+            _buildCommandlinesHelper(appArgs, 2u, rawCommands);
+
+            VERIFY_ARE_EQUAL(2u, appArgs._startupActions.size());
+            VERIFY_IS_TRUE(appArgs.ShouldActivateWindow());
+            VERIFY_ARE_EQUAL(std::string{ "hwnd:0x1234" }, std::string{ appArgs.GetTargetWindow() });
+
+            const auto newTabAction = appArgs._startupActions.at(0);
+            VERIFY_ARE_EQUAL(ShortcutAction::NewTab, newTabAction.Action());
+            const auto newTabArgs = newTabAction.Args().try_as<NewTabArgs>();
+            VERIFY_IS_NOT_NULL(newTabArgs);
+            const auto terminalArgs = newTabArgs.ContentArgs().try_as<NewTerminalArgs>();
+            VERIFY_IS_NOT_NULL(terminalArgs);
+            VERIFY_ARE_EQUAL(L"launching-codex", terminalArgs.TabTitle());
+
+            const auto sendInputAction = appArgs._startupActions.at(1);
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, sendInputAction.Action());
+            const auto sendInputArgs = sendInputAction.Args().try_as<SendInputArgs>();
+            VERIFY_IS_NOT_NULL(sendInputArgs);
+            VERIFY_ARE_EQUAL(L"approve action; keep target by hwnd", sendInputArgs.Input());
+            VERIFY_IS_TRUE(sendInputArgs.SubmitEnter());
+        }
     }
 
     void CommandlineTest::ValidateFirstCommandIsNewTab()

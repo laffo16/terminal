@@ -166,7 +166,7 @@ private:
     void _resetStateToDefault();
     int _handleExit(const CLI::App& command, const CLI::Error& e);
 
-    static void _addCommandsForArg(std::vector<Commandline>& commands, std::wstring_view arg);
+    static void _addCommandsForArg(std::vector<Commandline>& commands, std::wstring_view arg, bool preserveDelimiters);
 
 #ifdef UNIT_TESTING
     friend class TerminalAppLocalTests::CommandlineTest;
