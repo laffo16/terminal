@@ -571,8 +571,8 @@ namespace winrt::TerminalApp::implementation
             }
             else
             {
-                _ResizePane(realArgs.ResizeDirection());
-                args.Handled(true);
+                const auto resizeSucceeded = _ResizePane(realArgs.ResizeDirection());
+                args.Handled(resizeSucceeded);
             }
         }
     }
@@ -873,7 +873,7 @@ namespace winrt::TerminalApp::implementation
 
             _RemoveTabs(tabsToRemove);
 
-            actionArgs.Handled(true);
+            actionArgs.Handled(!tabsToRemove.empty());
         }
     }
 
@@ -909,7 +909,7 @@ namespace winrt::TerminalApp::implementation
             // tab row, until you mouse over them. Probably has something to do
             // with tabs not resizing down until there's a mouse exit event.
 
-            actionArgs.Handled(true);
+            actionArgs.Handled(!tabsToRemove.empty());
         }
     }
 
