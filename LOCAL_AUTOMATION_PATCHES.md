@@ -269,7 +269,7 @@ Example from this fork's current working flow:
   '<repo-root>\OpenConsole.slnx' `
   /p:Configuration=Release `
   /p:Platform=x64 `
-  /p:WindowsTerminalBranding=Release `
+  /p:WindowsTerminalBranding=Dev `
   /p:AppxSymbolPackageEnabled=false `
   /t:Terminal\CascadiaPackage `
   /m `
@@ -279,10 +279,36 @@ Example from this fork's current working flow:
 ### Register the locally built package
 
 ```powershell
-powershell.exe -NoProfile -Command "Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Register '<repo-root>\src\cascadia\CascadiaPackage\bin\x64\Release\AppxManifest.xml>'"
+powershell.exe -NoProfile -Command "Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Register '<repo-root>\src\cascadia\CascadiaPackage\bin\x64\Release\AppxManifest.xml'"
 ```
 
-The installed execution alias depends on package branding. Dev-branded packages typically expose `wtd.exe`; Preview/Release-branded packages typically expose `wt.exe`.
+This fork's maintained local install shape is Dev-branded, which exposes `wtd.exe`. Preview/Release-branded packages typically expose `wt.exe`. Do not switch branding or alias shape unless that is a deliberate test.
+
+After registration, verify the generated manifest and execution aliases before testing:
+
+```powershell
+Get-Command wtd.exe -ErrorAction SilentlyContinue
+Get-Command wt.exe -ErrorAction SilentlyContinue
+wtd.exe list-windows
+```
+
+The expected steady state for the Dev-branded install is that `wtd.exe` resolves and `wt.exe` does not, unless a stock Windows Terminal package has intentionally been installed side by side.
+
+## Upstream Merge Verification
+
+For routine upstream merges, prefer focused verification that covers this fork's automation surfaces without running the full visible app-host suite:
+
+- build the Dev-branded package
+- register or refresh the built package from `src\cascadia\CascadiaPackage\bin\x64\Release\AppxManifest.xml`
+- confirm `wtd.exe list-windows` works
+- run the targeted `localTerminalApp` command-line tests, for example `Invoke-OpenConsoleTests -Test localTerminalApp -Platform x64 -Configuration Debug -TaefArgs @('/name:TerminalAppLocalTests::CommandlineTest::*')`
+- run `unitSettingsModel`
+- run `unitControl`
+- run a live `wtd.exe send-input --enter -- <payload>` smoke against a disposable terminal window
+
+The full `localTerminalApp` suite launches the TAEF/UWP `TestHostApp` repeatedly. Visible `TestHostApp` windows and desktop flicker are expected during that suite, and do not indicate that stock Windows Terminal was installed or that the fork is launching unexpectedly.
+
+Only run the full `localTerminalApp` suite when the change touches app lifecycle, UI hosting, windowing, settings UI, or behavior that specifically needs broad app-level coverage. For send-input, selector, alias, and package-refresh checks, use the targeted command-line tests and live smoke instead.
 
 ## Notes For Maintainers Of This Fork
 
