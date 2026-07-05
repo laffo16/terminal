@@ -233,11 +233,14 @@ static std::wstring _createTempResponsePath()
     wchar_t tempPath[MAX_PATH];
     THROW_LAST_ERROR_IF(GetTempPathW(ARRAYSIZE(tempPath), tempPath) == 0);
 
-    wchar_t tempFile[MAX_PATH];
-    THROW_LAST_ERROR_IF(GetTempFileNameW(tempPath, L"wtq", 0, tempFile) == 0);
-    std::error_code ec;
-    std::filesystem::remove(tempFile, ec);
-    return tempFile;
+    GUID guid{};
+    THROW_IF_FAILED(CoCreateGuid(&guid));
+
+    wchar_t guidText[39];
+    THROW_HR_IF(E_FAIL, StringFromGUID2(guid, guidText, ARRAYSIZE(guidText)) == 0);
+
+    const auto responsePath = std::filesystem::path{ tempPath } / fmt::format(FMT_COMPILE(L"wtq-{}.tmp"), guidText);
+    return responsePath.wstring();
 }
 
 static std::optional<std::string> _queryListWindowsFromExistingInstance(const wchar_t* className, const wchar_t* secondaryClassName = nullptr)
@@ -1511,14 +1514,16 @@ LRESULT WindowEmperor::_messageHandler(HWND window, UINT const message, WPARAM c
                 {
                     _dispatchCommandlineCommon(argv, handoff.cwd, handoff.env, handoff.show);
                 }
+                return TRUE;
             }
             else if (cds->dwData == TERMINAL_LIST_WINDOWS_QUERY_MAGIC)
             {
                 wil::zwstring_view responsePath;
                 std::ignore = deserializeString(static_cast<const uint8_t*>(cds->lpData), static_cast<const uint8_t*>(cds->lpData) + cds->cbData, responsePath);
                 _writeWindowListJsonResponse(responsePath);
+                return TRUE;
             }
-            return 0;
+            return FALSE;
         case WM_HOTKEY:
             _hotkeyPressed(static_cast<long>(wParam));
             return 0;
