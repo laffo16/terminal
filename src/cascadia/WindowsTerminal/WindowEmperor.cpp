@@ -342,6 +342,7 @@ std::string WindowEmperor::_buildWindowListJson() const
         window["processId"] = Json::Value::UInt(processId);
         window["isFocused"] = hwnd == focusedWindow;
         window["tabCount"] = Json::Value::UInt(logic.NumberOfTabs());
+        window["paneCount"] = Json::Value::UInt(logic.Panes().Size());
         windows.append(std::move(window));
     }
 

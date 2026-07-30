@@ -88,6 +88,7 @@ Current per-window JSON fields:
 - `processId`
 - `isFocused`
 - `tabCount`
+- `paneCount` (leaf panes across all tabs in the window)
 
 ## Command Reference
 
