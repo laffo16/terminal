@@ -59,15 +59,19 @@ Patched shell env vars:
 - `WT_WINDOW_ID=<id>`
 - `WT_WINDOW_NAME=<name>` when set
 
-For Codex automation, prefer `WT_WINDOW_SELECTOR` or a saved `hwnd:0x...`
-selector from `list-windows`. Do not match on visible terminal titles; Codex can
-change title/status text while a turn is active, waiting for approval,
-compacting, or showing action-required state.
+For explicitly attended legacy/unmanaged Codex terminal automation, prefer
+`WT_WINDOW_SELECTOR` or a saved `hwnd:0x...` selector from `list-windows`. Do
+not match on visible terminal titles; Codex can change title/status text while a
+turn is active, waiting for approval, compacting, or showing action-required
+state. This fork exposes terminal primitives only; callers with a native
+session/control API should use it for ordinary Codex semantic delivery.
 
 Quick examples:
 
 ```powershell
 wt.exe -w hwnd:0x123456 send-input --enter "echo READY"
+# The remaining input examples are for restart or explicitly attended
+# legacy/unmanaged Codex workflows, not native managed-session delivery.
 wt.exe -w hwnd:0x123456 send-input --enter "Please reply exactly with TEST_OK."
 wt.exe -w hwnd:0x123456 send-input --enter -- "/quit"
 wt.exe -w hwnd:0x123456 send-input --enter -- "First line; still payload`nSecond line"

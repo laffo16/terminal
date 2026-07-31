@@ -144,17 +144,20 @@ wt.exe list-windows
 - explicit typed selectors are the preferred deterministic targeting surface for automation
 - current-shell discovery can now use `WT_WINDOW_SELECTOR`
 - external discovery can now use `wt list-windows`
-- For Codex and normal prompt submission, plain `--enter` is the preferred path.
+- For explicitly attended legacy/unmanaged Codex prompt submission, plain
+  `--enter` is the preferred terminal-input path.
 - `--enter-delay-ms <ms>` is an advanced override for callers that want custom timing.
-- Automation that targets Codex should not rely on terminal titles. Codex can
-  change titles or statusline text while a turn is running, waiting for
-  approval, compacting, or showing action-required state. Prefer the current
-  shell's `WT_WINDOW_SELECTOR` or a saved `hwnd:0x...` selector, and re-check
-  `wt list-windows` before delivery if the target may have moved.
-- `send-input` remains the local shell/handover path. Codex app-server or
-  remote-control APIs may eventually replace some prompt-delivery cases, but
-  they do not replace this fork's deterministic window targeting for shell
-  startup, `/quit`, resume, or fresh-session handover workflows.
+- Attended legacy/unmanaged automation that targets Codex should not rely on
+  terminal titles. Codex can change titles or statusline text while a turn is
+  running, waiting for approval, compacting, or showing action-required state.
+  Prefer the current shell's `WT_WINDOW_SELECTOR` or a saved `hwnd:0x...`
+  selector, and re-check `wt list-windows` before delivery if the target may
+  have moved.
+- `send-input` remains a deterministic terminal primitive for shell startup,
+  restart/resume lifecycle, and explicit attended legacy/unmanaged workflows.
+  It does not claim ownership of Codex semantic delivery. Callers with a native
+  session/control API should use that API for ordinary prompts, goals, steering,
+  interaction responses, or managed handover.
 
 ## Examples
 
@@ -164,7 +167,7 @@ wt.exe list-windows
 wt.exe -w hwnd:0x123456 send-input --enter "echo READY"
 ```
 
-### Codex prompt submission
+### Attended legacy/unmanaged Codex prompt submission
 
 ```powershell
 wt.exe -w hwnd:0x123456 send-input --enter "Please reply exactly with TEST_OK."
@@ -175,16 +178,21 @@ Use `--` before arbitrary prompt text, especially multiline text or text that
 contains semicolons. After `send-input --`, semicolons are payload characters,
 not WT command separators.
 
-For Codex automation, get the target from `WT_WINDOW_SELECTOR` or
-`wt.exe list-windows` first. Avoid matching on a visible title because action
-state, approval prompts, compaction, and dynamic status text can change it
-between discovery and delivery.
+These examples exercise the terminal primitive; they are not the supported
+semantic path for a natively managed Codex session. For an explicitly attended
+legacy/unmanaged run, get the target from `WT_WINDOW_SELECTOR` or `wt.exe
+list-windows` first. Avoid matching on a visible title because action state,
+approval prompts, compaction, and dynamic status text can change it between
+discovery and delivery.
 
-### Clean Codex quit
+### Restart or explicit legacy/unmanaged Codex quit
 
 ```powershell
 wt.exe -w hwnd:0x123456 send-input --enter -- "/quit"
 ```
+
+Do not infer managed-session retirement semantics from this terminal example;
+use the owning session/control API when one exists.
 
 ### Window-name targeting
 
