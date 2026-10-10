@@ -258,6 +258,12 @@ static std::optional<std::string> _queryListWindowsFromExistingInstance(const wc
             if (const auto hwnd = FindWindowW(candidateClassName, nullptr))
             {
                 const auto responsePath = _createTempResponsePath();
+                // Remove the response file on every exit path, including a send timeout or a read failure.
+                const auto removeResponse = wil::scope_exit([&responsePath]() noexcept {
+                    std::error_code ec;
+                    std::filesystem::remove(responsePath, ec);
+                });
+
                 std::vector<uint8_t> payload;
                 serializeString(payload, responsePath);
 
@@ -272,15 +278,18 @@ static std::optional<std::string> _queryListWindowsFromExistingInstance(const wc
                     THROW_LAST_ERROR();
                 }
 
-                std::ifstream stream{ responsePath, std::ios::binary };
-                if (!stream)
+                // Close the stream before the file is removed: the MSVC fstream
+                // opens without delete sharing, so removing it while open fails.
+                std::string response;
                 {
-                    throw std::runtime_error("Windows Terminal did not produce a list-windows response.");
-                }
+                    std::ifstream stream{ responsePath, std::ios::binary };
+                    if (!stream)
+                    {
+                        throw std::runtime_error("Windows Terminal did not produce a list-windows response.");
+                    }
 
-                const std::string response{ std::istreambuf_iterator<char>{ stream }, std::istreambuf_iterator<char>{} };
-                std::error_code ec;
-                std::filesystem::remove(responsePath, ec);
+                    response.assign(std::istreambuf_iterator<char>{ stream }, std::istreambuf_iterator<char>{});
+                }
                 return response;
             }
         }
