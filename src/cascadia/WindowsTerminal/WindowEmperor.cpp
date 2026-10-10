@@ -228,6 +228,34 @@ static void _writeTextToStdHandle(const DWORD handleId, const std::string& text)
     }
 }
 
+// A lone help or version switch, which the wt shim answers on the caller's
+// console when it has one. Keep this list in sync with the shim.
+static bool _isConsoleInfoRequest(const std::vector<winrt::hstring>& args) noexcept
+{
+    static constexpr std::wstring_view switches[]{ L"-h", L"--help", L"-?", L"/?", L"-v", L"--version" };
+    return args.size() == 2 && std::find(std::begin(switches), std::end(switches), std::wstring_view{ args[1] }) != std::end(switches);
+}
+
+static bool _hasStdOutput() noexcept
+{
+    const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    return handle && handle != INVALID_HANDLE_VALUE;
+}
+
+// Writes text to a standard handle: as UTF-16 to a console, as UTF-8 otherwise.
+static void _writeMessageToStdHandle(const DWORD handleId, std::wstring_view text)
+{
+    const auto handle = GetStdHandle(handleId);
+    if (DWORD mode = 0; handle && handle != INVALID_HANDLE_VALUE && GetConsoleMode(handle, &mode))
+    {
+        DWORD written = 0;
+        WriteConsoleW(handle, text.data(), gsl::narrow_cast<DWORD>(text.size()), &written, nullptr);
+        return;
+    }
+
+    _writeTextToStdHandle(handleId, til::u16u8(text));
+}
+
 static std::wstring _createTempResponsePath()
 {
     wchar_t tempPath[MAX_PATH];
@@ -699,6 +727,32 @@ void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
     {
         _writeTextToStdHandle(STD_ERROR_HANDLE, til::u16u8(listWindowsQueryError + L"\n"));
         ExitProcess(1);
+    }
+
+    // Print help or version text to the caller's output, or to the console of
+    // the launching process (Windows does not hand console handles to a GUI
+    // process, so attach to it), and exit without involving a running
+    // instance. Without either the request shows its message box as before.
+    if (_isConsoleInfoRequest(args) && (_hasStdOutput() || (AttachConsole(ATTACH_PARENT_PROCESS) && _hasStdOutput())))
+    {
+        try
+        {
+            winrt::TerminalApp::CommandlineArgs parsed;
+            parsed.Commandline(args);
+            const auto exitCode = parsed.ExitCode();
+            std::wstring message{ parsed.ExitMessage() };
+            if (!message.empty() && message.back() != L'\n')
+            {
+                message.push_back(L'\n');
+            }
+            _writeMessageToStdHandle(exitCode == 0 ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE, message);
+            ExitProcess(gsl::narrow_cast<UINT>(exitCode));
+        }
+        catch (...)
+        {
+            _writeTextToStdHandle(STD_ERROR_HANDLE, std::string{ "Unable to display the command line help.\n" });
+            ExitProcess(1);
+        }
     }
 
     // When running without package identity, set an explicit AppUserModelID so

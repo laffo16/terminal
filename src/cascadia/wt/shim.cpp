@@ -1,4 +1,5 @@
 #include <string>
+#include <string_view>
 #include <filesystem>
 #include <vector>
 #include <algorithm>
@@ -33,12 +34,38 @@ static bool _isQueryThatNeedsStdHandles(const std::vector<std::wstring>& args) n
     return args.size() >= 1 && _wcsicmp(args[0].c_str(), L"list-windows") == 0;
 }
 
+// A lone help or version switch is answered on the caller's console when it
+// has one. Keep this list in sync with WindowsTerminal's HandleCommandlineArgs.
+static bool _isConsoleInfoRequest(const std::vector<std::wstring>& args) noexcept
+{
+    static constexpr std::wstring_view switches[]{ L"-h", L"--help", L"-?", L"/?", L"-v", L"--version" };
+    return args.size() == 1 && std::find(std::begin(switches), std::end(switches), args[0]) != std::end(switches);
+}
+
+static bool _isUsableHandle(const HANDLE handle) noexcept
+{
+    return handle && handle != INVALID_HANDLE_VALUE;
+}
+
 #pragma warning(suppress : 26461) // we can't change the signature of wWinMain
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, LPWSTR pCmdLine, int)
 {
     std::filesystem::path module{ wil::GetModuleFileNameW<std::wstring>(nullptr) };
     const auto args = _commandlineToArgs(pCmdLine);
-    const auto forwardStdHandles = _isQueryThatNeedsStdHandles(args);
+    auto forwardStdHandles = _isQueryThatNeedsStdHandles(args);
+    auto waitForExit = forwardStdHandles;
+
+    // Answer a help or version request on the caller's console: forward the
+    // caller's output handles, and attach to its console so that
+    // WindowsTerminal can attach to ours (Windows does not hand console
+    // handles to a GUI process). Without either (a launch from Explorer, for
+    // example) the request keeps its message box.
+    if (!forwardStdHandles && _isConsoleInfoRequest(args))
+    {
+        forwardStdHandles = _isUsableHandle(GetStdHandle(STD_OUTPUT_HANDLE));
+        const auto attached = AttachConsole(ATTACH_PARENT_PROCESS) != FALSE;
+        waitForExit = forwardStdHandles || attached;
+    }
 
     // Cache our name (wt, wtd)
     std::wstring ourFilename{ module.filename() };
@@ -72,7 +99,7 @@ int __stdcall wWinMain(HINSTANCE, HINSTANCE, LPWSTR pCmdLine, int)
         return 1;
     }
 
-    if (forwardStdHandles)
+    if (waitForExit)
     {
         WaitForSingleObject(pi.hProcess, INFINITE);
 
